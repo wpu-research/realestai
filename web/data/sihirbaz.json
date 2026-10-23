@@ -1,0 +1,120 @@
+{
+  "_aciklama": "Arama sihirbazı soruları. Her adım bir filtre alanını doldurur. 'gosterIf' koşulu tutmayan adım atlanır. Metinler TR; EN/RU/DE çevirileri i18n dosyalarına eklenir. Avatar asistanı da aynı alanları sorar (asistan Edge Function).",
+  "adimlar": [
+    {
+      "id": "tip",
+      "soru": "Ne arıyorsunuz?",
+      "tur": "tek_secim",
+      "alan": "tip",
+      "zorunlu": true,
+      "secenekler": [
+        { "deger": "satilik", "etiket": "Ev satın almak", "ikon": "home" },
+        { "deger": "kiralik", "etiket": "Yıllık kiralamak", "ikon": "key" },
+        { "deger": "sezonluk", "etiket": "Yazı geçirmek (birkaç ay)", "ikon": "sun" },
+        { "deger": "gunluk", "etiket": "Tatil (gecelik / haftalık)", "ikon": "palmtree" }
+      ]
+    },
+    {
+      "id": "tarihler",
+      "soru": "Hangi tarihlerde?",
+      "tur": "tarih_araligi",
+      "alanlar": ["giris_tarihi", "cikis_tarihi"],
+      "zorunlu": true,
+      "gosterIf": { "tip": ["gunluk", "sezonluk"] },
+      "yardim": "Tarihleriniz esnekse yaklaşık seçin, sonra değiştirebilirsiniz."
+    },
+    {
+      "id": "kisi",
+      "soru": "Kaç kişi olacaksınız?",
+      "tur": "sayac",
+      "alan": "min_kapasite",
+      "min": 1,
+      "max": 20,
+      "varsayilan": 2,
+      "zorunlu": true,
+      "gosterIf": { "tip": ["gunluk", "sezonluk"] }
+    },
+    {
+      "id": "amac",
+      "soru": "Evi ne için düşünüyorsunuz?",
+      "tur": "tek_secim",
+      "alan": "_amac",
+      "zorunlu": false,
+      "gosterIf": { "tip": ["satilik"] },
+      "secenekler": [
+        { "deger": "oturum", "etiket": "Kendim / ailem oturacak" },
+        { "deger": "yazlik", "etiket": "Yazlık olarak kullanacağım" },
+        { "deger": "yatirim", "etiket": "Yatırım / kiraya vermek" }
+      ],
+      "_not": "_amac filtre değildir; yatirim seçilirse siralama='en_firsat' ve sadece_firsat önerilir, oturum seçilirse Konacık/merkez gibi yıl boyu yaşanan mahalleler öne çıkar."
+    },
+    {
+      "id": "oda",
+      "soru": "Kaç oda istersiniz?",
+      "tur": "coklu_secim",
+      "alan": "oda",
+      "zorunlu": false,
+      "gosterIf": { "tip": ["satilik", "kiralik", "sezonluk"] },
+      "secenekler": [
+        { "deger": "1+1", "etiket": "1+1" },
+        { "deger": "2+1", "etiket": "2+1" },
+        { "deger": "3+1", "etiket": "3+1" },
+        { "deger": "4+1", "etiket": "4+1 ve üzeri" }
+      ]
+    },
+    {
+      "id": "butce",
+      "soru": "Bütçeniz ne kadar?",
+      "tur": "butce",
+      "alanlar": ["min_fiyat", "max_fiyat", "para_birimi"],
+      "zorunlu": true,
+      "birimEtiketi": { "satilik": "toplam", "kiralik": "aylık", "sezonluk": "sezon toplamı", "gunluk": "gecelik" },
+      "hazirAraliklar": {
+        "satilik": [[0, 5000000], [5000000, 10000000], [10000000, 20000000], [20000000, null]],
+        "kiralik": [[0, 30000], [30000, 50000], [50000, 80000], [80000, null]],
+        "sezonluk": [[0, 300000], [300000, 600000], [600000, 1200000], [1200000, null]],
+        "gunluk": [[0, 3000], [3000, 6000], [6000, 12000], [12000, null]]
+      },
+      "_not": "Hazır aralıklar kartlarla seçilir, altında elle giriş. Aralıklar TRY; para birimi değişirse kur tablosuyla çevrilir."
+    },
+    {
+      "id": "bolge",
+      "soru": "Nasıl bir yer tercih edersiniz?",
+      "tur": "coklu_secim",
+      "alan": "mahalleler",
+      "zorunlu": false,
+      "secenekler": [
+        { "deger": "@sakin", "etiket": "Sakin, doğayla iç içe", "mahalleler": ["gumusluk", "akyarlar", "gundogan", "golkoy"] },
+        { "deger": "@hareketli", "etiket": "Hareketli, eğlence ve restoranlar", "mahalleler": ["merkez", "gumbet", "yalikavak", "turgutreis"] },
+        { "deger": "@aile", "etiket": "Aile dostu, plajlar", "mahalleler": ["bitez", "ortakent", "turgutreis", "torba"] },
+        { "deger": "@luks", "etiket": "Lüks ve prestijli", "mahalleler": ["yalikavak", "golturkbuku", "torba"] },
+        { "deger": "@yilboyu", "etiket": "Yıl boyu yaşamak için", "mahalleler": ["konacik", "merkez", "turgutreis", "ortakent"] },
+        { "deger": "@harita", "etiket": "Haritadan kendim seçeyim" }
+      ],
+      "_not": "@ ile başlayan seçenekler mahalle gruplarıdır; seçilince ilgili mahalle slug'ları filtreye eklenir. @harita seçilirse mahalle haritası açılır."
+    },
+    {
+      "id": "olmazsa_olmaz",
+      "soru": "Olmazsa olmazlarınız neler?",
+      "tur": "coklu_secim",
+      "zorunlu": false,
+      "secenekler": [
+        { "deger": "havuz", "etiket": "Havuz", "filtre": { "havuz": "herhangi" } },
+        { "deger": "ozel_havuz", "etiket": "Özel havuz", "filtre": { "havuz": "ozel" } },
+        { "deger": "manzara", "etiket": "Deniz manzarası", "filtre": { "deniz_manzarasi": true } },
+        { "deger": "deniz_yakin", "etiket": "Denize yürüme mesafesi", "filtre": { "max_denize_mesafe_m": 500 } },
+        { "deger": "site", "etiket": "Site içinde", "filtre": { "site_ici": true } },
+        { "deger": "esyali", "etiket": "Eşyalı", "filtre": { "esyali": true }, "gosterIf": { "tip": ["kiralik", "satilik"] } },
+        { "deger": "evcil", "etiket": "Evcil hayvan kabul", "filtre": { "evcil_hayvan": true }, "gosterIf": { "tip": ["kiralik", "sezonluk", "gunluk"] } }
+      ]
+    },
+    {
+      "id": "firsat",
+      "soru": "Sadece piyasanın altındaki fırsatları mı görmek istersiniz?",
+      "tur": "evet_hayir",
+      "alan": "sadece_firsat",
+      "zorunlu": false,
+      "gosterIf": { "tip": ["satilik", "kiralik"] }
+    }
+  ]
+}

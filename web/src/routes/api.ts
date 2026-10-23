@@ -1,0 +1,70 @@
+import { Hono } from "hono";
+import { asistan, sesliArama, type AsistanMesaj } from "../ai/claude.js";
+import { sql } from "../db.js";
+import { filtreUrl, ilanAra, type Filtreler } from "../lib/arama.js";
+
+export const api = new Hono();
+
+// Basit IP başına sınır (Claude çağrıları ücretli). Tek süreçli servis için bellek yeterli.
+const pencere = new Map<string, { n: number; bas: number }>();
+function sinirAsildi(ip: string, limit = 30, ms = 10 * 60_000): boolean {
+  const simdi = Date.now();
+  const p = pencere.get(ip);
+  if (!p || simdi - p.bas > ms) { pencere.set(ip, { n: 1, bas: simdi }); return false; }
+  return ++p.n > limit;
+}
+const ipAl = (h: (k: string) => string | undefined) => h("x-forwarded-for")?.split(",")[0].trim() ?? "yerel";
+
+api.post("/sesli-arama", async (c) => {
+  if (sinirAsildi(ipAl(c.req.header.bind(c.req)))) return c.json({ hata: "çok fazla istek, biraz sonra deneyin" }, 429);
+  const { metin, dil = "tr", onceki } = await c.req.json<{ metin?: string; dil?: string; onceki?: Filtreler }>();
+  if (typeof metin !== "string" || !metin.trim() || metin.length > 1000) return c.json({ hata: "metin gerekli" }, 400);
+  try {
+    const sonuc = await sesliArama(metin.trim(), dil, onceki);
+    sql`insert into sesli_arama_kayitlari (metin, filtreler, dil) values (${metin}, ${sql.json(sonuc.filtreler as any)}, ${dil})`
+      .catch((e) => console.error("arama kaydı", e));
+    return c.json({ ...sonuc, url: `/ara?${filtreUrl(sonuc.filtreler)}` });
+  } catch (e) {
+    console.error("sesli-arama", e);
+    return c.json({ hata: "arama yorumlanamadı" }, 500);
+  }
+});
+
+api.post("/asistan", async (c) => {
+  if (sinirAsildi(ipAl(c.req.header.bind(c.req)), 60)) return c.json({ hata: "çok fazla istek, biraz sonra deneyin" }, 429);
+  const { mesajlar = [], filtreler = {}, dil = "tr", oturum_id } =
+    await c.req.json<{ mesajlar?: AsistanMesaj[]; filtreler?: Filtreler; dil?: string; oturum_id?: string }>();
+  if (!Array.isArray(mesajlar) || mesajlar.length > 40 || mesajlar.some((m) => typeof m?.metin !== "string" || m.metin.length > 1000)) {
+    return c.json({ hata: "geçersiz konuşma" }, 400);
+  }
+  try {
+    const sonuc = await asistan(mesajlar, filtreler, dil);
+    let id = oturum_id;
+    try {
+      if (id) {
+        await sql`update asistan_oturumlari set filtreler = ${sql.json(sonuc.filtreler as any)}, tamamlandi = ${sonuc.tamamlandi},
+                  adim_sayisi = ${Math.ceil(mesajlar.length / 2) + 1}, updated_at = now() where id = ${id}`;
+      } else {
+        [{ id }] = await sql<{ id: string }[]>`insert into asistan_oturumlari (kanal, dil, filtreler, tamamlandi, adim_sayisi)
+                  values ('avatar', ${dil}, ${sql.json(sonuc.filtreler as any)}, ${sonuc.tamamlandi}, 1) returning id`;
+      }
+    } catch (e) { console.error("oturum kaydı", e); }
+    return c.json({ ...sonuc, oturum_id: id, url: `/ara?${filtreUrl(sonuc.filtreler)}` });
+  } catch (e) {
+    console.error("asistan", e);
+    return c.json({ hata: "asistan şu an yanıt veremiyor" }, 500);
+  }
+});
+
+// Sihirbaz son ekranı: kaç ilan çıkıyor.
+api.post("/sayim", async (c) => {
+  const f = await c.req.json<Filtreler>();
+  return c.json({ sayi: await ilanAra(f, { sayim: true }), url: `/ara?${filtreUrl(f)}` });
+});
+
+api.post("/sihirbaz-oturum", async (c) => {
+  const { filtreler = {}, tamamlandi = false, adim_sayisi = 0, sonuc_sayisi = null } = await c.req.json();
+  await sql`insert into asistan_oturumlari (kanal, filtreler, tamamlandi, adim_sayisi, sonuc_sayisi)
+            values ('sihirbaz', ${sql.json(filtreler)}, ${!!tamamlandi}, ${Number(adim_sayisi) || 0}, ${sonuc_sayisi})`;
+  return c.json({ ok: true });
+});
