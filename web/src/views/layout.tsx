@@ -35,10 +35,15 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], asis
             <a href="/" class="logo">{SITE_ADI}</a>
             <nav class="ust-nav" data-menu>
               <a href="/ara">İlanlar</a>
+              <a href="/endeks">Emlak endeksi</a>
+              <a href="/kredi">Kredi hesapla</a>
+              <a href="/emlakci-bul">Bana emlakçı bul</a>
               <a href="/evimi-listele">Evinizi listeleyin</a>
-              <a href="/sihirbaz">Adım adım ara</a>
-              <a href="/asistan">Didem'le konuş</a>
             </nav>
+            <a href="/kaydedilenler" class="kayit-link" aria-label="Kaydedilenler">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+              <span class="kayit-yazi">Kaydedilenler</span><span class="rozet-sayi" data-kayit-sayi hidden></span>
+            </a>
             <button type="button" class="menu-dugme" aria-label="Menü" onclick="document.querySelector('[data-menu]').classList.toggle('acik')"><Menu boyut={22} /></button>
           </div>
         </header>
@@ -49,6 +54,13 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], asis
               <a href="/" class="logo">{SITE_ADI}</a>
               <p>Bodrum · Milas · Didim</p>
               <p class="kucuk">Taşınmaz Ticareti Yetki Belgesi No: [doldurulacak]</p>
+            </div>
+            <div class="alt-sutun">
+              <strong>Rehberler</strong>
+              <a href="/rehber/alirken">Alırken</a>
+              <a href="/rehber/satarken">Satarken</a>
+              <a href="/rehber/kiralarken">Kiralarken</a>
+              <a href="/kredi">Kredi hesapla</a>
             </div>
             <div class="alt-sutun">
               <strong>Yasal</strong>
@@ -71,7 +83,7 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], asis
           </a>
         )}
         {harita && <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>}
-        {scriptler.map((s) => <script type="module" src={s}></script>)}
+        {[...new Set([...scriptler, "/js/kaydet.js"])].map((s) => <script type="module" src={s}></script>)}
       </body>
     </html>
   );
@@ -91,13 +103,16 @@ export function IlanKarti({ i }: { i: IlanKart }) {
         {kapak ? <img src={kapak} alt="" loading="lazy" /> : <div class="gorsel-yok"></div>}
         <span class="rozet rozet-tip">{TIP_ETIKET[i.tip]}</span>
         {i.demo && <span class="rozet rozet-demo">DEMO</span>}
+        <button type="button" class="kalp" data-kaydet-ilan={i.ilan_no} aria-label="Kaydet" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+        </button>
         {i.iskonto != null && i.iskonto >= 0.15 && (
           <span class="rozet rozet-firsat">Bölge ortalamasının %{Math.round(i.iskonto * 100)} altında</span>
         )}
       </div>
       <div class="kart-govde">
         <h3>{i.baslik}</h3>
-        <div class="kart-yer">{i.mahalle ?? "Bodrum"}, {i.ilce ?? "Bodrum"}</div>
+        <div class="kart-yer">{i.mahalle ?? "Bodrum"}, {i.ilce ?? "Bodrum"}{i.mesafe_km != null && ` · ${i.mesafe_km < 1 ? "<1" : Math.round(i.mesafe_km)} km`}</div>
         <div class="kart-ozellik">
           {i.oda && <span><Yatak boyut={14} />{i.oda}</span>}
           {i.net_m2 && <span><Alan boyut={14} />{i.net_m2} m²</span>}

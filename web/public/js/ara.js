@@ -1,29 +1,121 @@
-// Arama sayfası: Airbnb gibi harita — kaydırınca/yakınlaştırınca liste görünen alana göre yenilenir.
+// Arama sayfası: filtre paneli, fiyat kaydırıcısı, adres zinciri, yakınımda ara ve
+// Airbnb gibi harita (kaydırınca/yakınlaştırınca liste görünen alana göre yenilenir).
 import { escape } from "./ortak.js";
 
 const BODRUM = [[36.95, 27.2], [37.16, 27.5]];
-const sonucAlani = document.querySelector("[data-sonuc-alani]");
-const sayiEl = document.querySelector("[data-sonuc-sayi]");
 const panel = document.querySelector("[data-filtre-panel]");
 const sinirGizli = panel.querySelector("[data-sinir-gizli]");
+const masaustu = () => window.matchMedia("(min-width: 1024px)").matches;
 
 // ---------- Filtre paneli ----------
 document.querySelector("[data-filtre-ac]")?.addEventListener("click", () => panel.classList.add("acik"));
 document.querySelector("[data-filtre-kapat]")?.addEventListener("click", () => panel.classList.remove("acik"));
+
 function gonder() {
-  for (const el of panel.querySelectorAll("input, select")) if (!el.value) el.disabled = true;
+  // Boş alanları ve kaydırıcıları URL'ye taşıma.
+  for (const el of panel.querySelectorAll("input, select")) if (!el.value || el.type === "range") el.disabled = true;
+  const kelime = document.querySelector("input[name=kelime]");
+  if (kelime && !kelime.value) kelime.disabled = true;
   panel.submit();
 }
 panel.addEventListener("submit", (e) => { e.preventDefault(); gonder(); });
-const masaustu = () => window.matchMedia("(min-width: 1024px)").matches;
-panel.querySelectorAll(".filtre-cip input, .kutu input").forEach((el) =>
+
+// Masaüstünde dokunmalı seçimler anında uygulanır; telefonda "Sonuçları göster" ile.
+panel.querySelectorAll(".filtre-cip input, select").forEach((el) =>
   el.addEventListener("change", () => { if (masaustu()) gonder(); }));
-document.querySelector("[data-siralama]")?.addEventListener("change", (e) => {
-  panel.querySelector("[data-siralama-gizli]").value = e.target.value;
-  gonder();
+
+// ---------- Fiyat: çift kaydırıcı + Min/Max kutuları ----------
+const kayd = panel.querySelector("[data-kaydirici]");
+if (kayd) {
+  const ust = Number(kayd.dataset.ust);
+  const aMin = kayd.querySelector("[data-aralik-min]");
+  const aMax = kayd.querySelector("[data-aralik-max]");
+  const kMin = panel.querySelector("[data-fiyat-min]");
+  const kMax = panel.querySelector("[data-fiyat-max]");
+  const dolu = kayd.querySelector("[data-dolu]");
+  const eMin = panel.querySelector("[data-etiket-min]");
+  const eMax = panel.querySelector("[data-etiket-max]");
+  const bicim = (x) => new Intl.NumberFormat("tr-TR", { notation: x >= 1e6 ? "compact" : "standard", maximumFractionDigits: 1 }).format(x);
+
+  const ciz = () => {
+    const a = Number(aMin.value), b = Number(aMax.value);
+    dolu.style.left = `${(a / ust) * 100}%`;
+    dolu.style.right = `${100 - (b / ust) * 100}%`;
+    eMin.textContent = bicim(a);
+    eMax.textContent = b >= ust ? `${bicim(ust)}+` : bicim(b);
+  };
+  const kaydiricidan = () => {
+    if (Number(aMin.value) > Number(aMax.value)) [aMin.value, aMax.value] = [aMax.value, aMin.value];
+    kMin.value = Number(aMin.value) > 0 ? aMin.value : "";
+    kMax.value = Number(aMax.value) < ust ? aMax.value : "";
+    ciz();
+  };
+  const kutudan = () => {
+    aMin.value = Math.min(Number(kMin.value) || 0, ust);
+    aMax.value = kMax.value ? Math.min(Number(kMax.value), ust) : ust;
+    ciz();
+  };
+  aMin.addEventListener("input", kaydiricidan);
+  aMax.addEventListener("input", kaydiricidan);
+  aMin.addEventListener("change", () => masaustu() && gonder());
+  aMax.addEventListener("change", () => masaustu() && gonder());
+  kMin.addEventListener("input", kutudan);
+  kMax.addEventListener("input", kutudan);
+  ciz();
+}
+
+// ---------- Adres: il → ilçe → mahalle çipleri ----------
+const ilSec = panel.querySelector("[data-il]");
+const ilceSec = panel.querySelector("[data-ilce]");
+function mahalleSuz() {
+  const il = ilSec.value, ilce = ilceSec.value;
+  panel.querySelectorAll("[data-mahalle-cipler] .filtre-cip").forEach((c) => {
+    const uygun = (!il || c.dataset.ilAdi === il) && (!ilce || c.dataset.ilceAdi === ilce);
+    c.hidden = !uygun;
+    if (!uygun) c.querySelector("input").checked = false;
+  });
+}
+ilSec?.addEventListener("change", () => { ilceSec.value = ""; mahalleSuz(); });
+ilceSec?.addEventListener("change", mahalleSuz);
+mahalleSuz();
+
+// ---------- Yakınımda ara ----------
+const yakinDurum = panel.querySelector("[data-yakin-durum]");
+panel.querySelector("[data-yakinimda]")?.addEventListener("click", () => {
+  const gizli = panel.querySelector("[data-yakin-gizli]");
+  if (gizli.value) { gizli.value = ""; gonder(); return; }   // açıksa kapat
+  if (!navigator.geolocation) { yakinDurum.textContent = "Tarayıcınız konum paylaşımını desteklemiyor."; return; }
+  yakinDurum.textContent = "Konum izni bekleniyor…";
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      gizli.value = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`;
+      panel.querySelector("input[name=siralama]").value = "yakin";
+      gonder();
+    },
+    (h) => {
+      yakinDurum.textContent = h.code === 1
+        ? "Konum izni verilmedi. Tarayıcı ayarlarından izin verebilir ya da adres seçebilirsiniz."
+        : "Konumunuz alınamadı, lütfen tekrar deneyin.";
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+  );
 });
 
 // ---------- Harita ----------
+const sonucAlani = document.querySelector("[data-sonuc-alani]");
+const sayiEl = document.querySelector("[data-sonuc-sayi]");
+const mobilHarita = document.querySelector("[data-mobil-harita]");
+
+panel.querySelector("[data-haritada-ara]")?.addEventListener("click", () => {
+  panel.classList.remove("acik");
+  const hedef = masaustu() ? document.querySelector(".ara-harita .harita-kart") : mobilHarita;
+  if (!masaustu()) mobilHarita.classList.add("tam-ekran");
+  hedef.scrollIntoView({ behavior: "smooth", block: "center" });
+  hedef.classList.add("parla");
+  setTimeout(() => hedef.classList.remove("parla"), 1500);
+  window.dispatchEvent(new Event("resize"));
+});
+
 const kap = [...document.querySelectorAll(".harita-kart")].find((el) => el.offsetParent !== null);
 const el = kap?.querySelector("[data-harita]");
 if (el && window.L) {
@@ -33,6 +125,7 @@ if (el && window.L) {
   const isaretler = new Map();
   const kaydirincaAra = kap.querySelector("[data-kaydirinca-ara]");
   const buAlanda = kap.querySelector("[data-bu-alanda-ara]");
+  window.addEventListener("resize", () => setTimeout(() => harita.invalidateSize(), 300));
 
   const noktalariOku = () => JSON.parse(sonucAlani.querySelector("[data-noktalar]")?.textContent || "[]");
 
@@ -52,16 +145,12 @@ if (el && window.L) {
       m.addTo(katman);
       isaretler.set(String(n.no), m);
     }
-    kartVurgusu();
-  }
-
-  // Kartın üzerine gelince haritadaki fiyat etiketi öne çıkar.
-  function kartVurgusu() {
     sonucAlani.querySelectorAll("a.kart").forEach((k) => {
       const no = k.getAttribute("href").split("/").pop();
       k.addEventListener("mouseenter", () => isaretler.get(no)?.getElement()?.classList.add("vurgulu"));
       k.addEventListener("mouseleave", () => isaretler.get(no)?.getElement()?.classList.remove("vurgulu"));
     });
+    document.dispatchEvent(new Event("kartlar-yenilendi"));
   }
 
   // İlk görünüm: URL'de harita alanı varsa o, yoksa sonuçlara sığdır.
@@ -72,6 +161,9 @@ if (el && window.L) {
   else if (ilk.length) harita.fitBounds(ilk.map((n) => [n.lat, n.lng]), { padding: [40, 40], maxZoom: 13 });
   else harita.fitBounds(BODRUM);
   isaretle(ilk);
+  // Yakınımda aramasında kullanıcının konumunu göster.
+  const yakin = new URL(location.href).searchParams.get("yakin")?.split(",").map(Number);
+  if (yakin?.length === 2) L.circleMarker(yakin, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(harita).bindTooltip("Konumunuz");
   setTimeout(() => (sistemHareketi = false), 600);
 
   let zamanlayici;
@@ -108,3 +200,9 @@ if (el && window.L) {
   buAlanda.addEventListener("click", alaniAra);
   kaydirincaAra.addEventListener("change", () => { if (kaydirincaAra.checked) alaniAra(); });
 }
+
+// Sırala menüsü dışına tıklanınca kapansın.
+document.addEventListener("click", (e) => {
+  const s = document.querySelector("[data-sirala]");
+  if (s?.open && !s.contains(e.target)) s.open = false;
+});

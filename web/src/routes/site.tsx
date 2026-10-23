@@ -4,6 +4,9 @@ import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } fr
 import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
 import { Ara, Ayar, Konum, Mikrofon, Ok, Onay } from "../views/ikon.js";
 import { IlanKarti, json, ornekGorsel, Sayfa } from "../views/layout.js";
+import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
+
+const etiket = (liste: { k: string; e: string }[], k: string | null) => (k ? liste.find((x) => x.k === k)?.e ?? k : null);
 
 export const site = new Hono();
 
@@ -21,8 +24,8 @@ function AramaKutusu({ deger = "", hero = false }: { deger?: string; hero?: bool
   return (
     <form class={`arama-kutu ${hero ? "hero-arama" : ""}`} data-sesli-arama action="/ara" method="get">
       <span class="arama-ikon"><Ara boyut={hero ? 20 : 18} /></span>
-      <input name="q" value={deger} placeholder="Örn. Bitez'de denize yakın havuzlu 2+1 satılık" autocomplete="off" />
-      <button type="button" class="mikrofon" data-mikrofon aria-label="Sesli ara" hidden><Mikrofon boyut={hero ? 20 : 18} /></button>
+      <input name="kelime" value={deger} placeholder="Mahalle, site adı ya da özellik yazın…" autocomplete="off" />
+      <button type="button" class="sesli-arama-dugme" data-mikrofon hidden><Mikrofon boyut={hero ? 20 : 18} /><span>Detaylı sesli arama</span></button>
       <button type="submit" class="ara-dugme">Ara</button>
       <div class="arama-durum" data-durum></div>
     </form>
@@ -51,6 +54,10 @@ site.get("/", async (c) => {
               <a href={`/ara?tip=${t}`} class="cam-cip">{TIP_ETIKET[t]}</a>
             ))}
           </div>
+          <div class="hero-ornekler">
+            <span>Detaylı arama örneği:</span>
+            {ORNEKLER.slice(0, 2).map((o) => <button type="button" class="ornek-cam" data-ornek={o}>"{o}"</button>)}
+          </div>
           <div class="hero-alt-link">
             <a href="/sihirbaz">Adım adım arayalım</a><span>·</span><a href="/asistan">Didem'le konuşarak ara</a>
           </div>
@@ -63,6 +70,37 @@ site.get("/", async (c) => {
           <a href="/ara?siralama=en_firsat" class="bolum-link">Tüm ilanlar <Ok boyut={14} /></a>
         </div>
         <div class="kartlar uc-sutun">{firsatlar.map((i) => <IlanKarti i={i} />)}</div>
+      </section>
+
+      <section class="kap bolum arac-bolum">
+        <h2>Alırken, satarken, kiralarken</h2>
+        <div class="arac-izgara">
+          <a href="/rehber/alirken" class="arac-kart">
+            <span class="arac-ust">Alırken</span>
+            <strong>Gayrimenkul ekspertizi ve alım rehberi</strong>
+            <p>Ev satın alırken ekspertiz, tapu ve masraflarla ilgili ihtiyacınız olan bilgilere kolayca ulaşın.</p>
+          </a>
+          <a href="/rehber/satarken" class="arac-kart">
+            <span class="arac-ust">Satarken</span>
+            <strong>Emlak alım/satım rehberi</strong>
+            <p>Evinizi satarken ihtiyacınız olacak belgeleri, adımları ve masrafları hızlıca öğrenin.</p>
+          </a>
+          <a href="/rehber/kiralarken" class="arac-kart">
+            <span class="arac-ust">Kiralarken</span>
+            <strong>Emlak endeksi</strong>
+            <p>Bölgedeki evlerin fiyat ortalamalarını ve değişimlerini mahalle mahalle görün.</p>
+          </a>
+          <a href="/kredi" class="arac-kart">
+            <span class="arac-ust">Kredi</span>
+            <strong>Konut kredisi hesapla</strong>
+            <p>Ev alırken kredi tutarına, vadeye ve faize göre aylık taksidinizi hemen hesaplayın.</p>
+          </a>
+        </div>
+        <div class="arac-serit">
+          <a href="/endeks">📈 Emlak endeksi</a>
+          <a href="/kredi">🧮 Kredi hesapla</a>
+          <a href="/emlakci-bul">🤝 Bana emlakçı bul</a>
+        </div>
       </section>
 
       <section class="kum-bolum">
@@ -93,124 +131,6 @@ site.get("/", async (c) => {
   );
 });
 
-// ---------- Arama ----------
-// Airbnb gibi: haritayı kaydırınca/yakınlaştırınca liste görünen alana göre yenilenir.
-const HaritaUstu = () => (
-  <div class="harita-ustu">
-    <label class="harita-secim"><input type="checkbox" data-kaydirinca-ara checked />Haritayı kaydırınca ara</label>
-    <button type="button" class="harita-bu-alan" data-bu-alanda-ara hidden>Bu alanda ara</button>
-  </div>
-);
-site.get("/ara", async (c) => {
-  const q = new URL(c.req.url).searchParams;
-  const f = filtreOku(q);
-  const metin = q.get("q") ?? "";
-  const [sonuclar, mh] = await Promise.all([ilanAra(f) as Promise<IlanKart[]>, mahalleler()]);
-  const oneri = sonuclar.length === 0 ? await gevsetmeOnerisi(f) : null;
-  const dizide = (k: keyof Filtreler, v: string) => ((f[k] as string[] | undefined) ?? []).includes(v);
-  const CipKutu = ({ ad, deger, etiket, secili, radyo }: { ad: string; deger: string; etiket: string; secili: boolean; radyo?: boolean }) => (
-    <label class="filtre-cip"><input type={radyo ? "radio" : "checkbox"} name={ad} value={deger} checked={secili} />{etiket}</label>
-  );
-
-  return c.html(
-    <Sayfa baslik="İlanlar" harita scriptler={["/js/sesli-arama.js", "/js/ara.js"]}>
-      <div class="ara-sayfa">
-        <form class="filtre-panel" method="get" action="/ara" data-filtre-panel>
-          <div class="panel-bas"><span class="ust-etiket">Filtreler</span><button type="button" data-filtre-kapat aria-label="Kapat">✕</button></div>
-          <div class="filtre-grup"><h4>Tip</h4>
-            <div class="cipler">
-              <CipKutu ad="tip" deger="" etiket="Hepsi" secili={!f.tip} radyo />
-              {Object.entries(TIP_ETIKET).map(([k, v]) => <CipKutu ad="tip" deger={k} etiket={v} secili={f.tip === k} radyo />)}
-            </div>
-          </div>
-          <div class="filtre-grup"><h4>Mahalle</h4>
-            <div class="cipler">{mh.map((m) => <CipKutu ad="mahalleler" deger={m.slug} etiket={m.ad} secili={dizide("mahalleler", m.slug)} />)}</div>
-          </div>
-          <div class="filtre-grup"><h4>Fiyat ({f.para_birimi ?? "TRY"})</h4>
-            <div class="iki">
-              <input type="number" name="min_fiyat" value={f.min_fiyat ?? ""} min="0" placeholder="Min" />
-              <input type="number" name="max_fiyat" value={f.max_fiyat ?? ""} min="0" placeholder="Maks" />
-            </div>
-            <input type="hidden" name="para_birimi" value={f.para_birimi ?? ""} />
-          </div>
-          <div class="filtre-grup"><h4>Oda</h4>
-            <div class="cipler">{["1+0", "1+1", "2+1", "3+1", "4+1", "5+1"].map((o) => <CipKutu ad="oda" deger={o} etiket={o} secili={dizide("oda", o)} />)}</div>
-          </div>
-          <div class="filtre-grup iki">
-            <label>Min m²<input type="number" name="min_net_m2" value={f.min_net_m2 ?? ""} min="0" /></label>
-            <label>Min kapasite<input type="number" name="min_kapasite" value={f.min_kapasite ?? ""} min="1" /></label>
-          </div>
-          <div class="filtre-grup"><h4>Havuz</h4>
-            <div class="cipler">
-              <CipKutu ad="havuz" deger="" etiket="Fark etmez" secili={!f.havuz} radyo />
-              <CipKutu ad="havuz" deger="ozel" etiket="Özel" secili={f.havuz === "ozel"} radyo />
-              <CipKutu ad="havuz" deger="ortak" etiket="Ortak" secili={f.havuz === "ortak"} radyo />
-            </div>
-          </div>
-          <div class="filtre-grup">
-            <label>Denize max (m)<input type="number" name="max_denize_mesafe_m" value={f.max_denize_mesafe_m ?? ""} min="0" step="100" /></label>
-          </div>
-          <div class="filtre-grup kutular">
-            <label class="kutu"><input type="checkbox" name="deniz_manzarasi" value="1" checked={!!f.deniz_manzarasi} />Deniz manzarası</label>
-            <label class="kutu"><input type="checkbox" name="site_ici" value="1" checked={!!f.site_ici} />Site içi</label>
-            <label class="kutu"><input type="checkbox" name="esyali" value="1" checked={!!f.esyali} />Eşyalı</label>
-            <label class="kutu"><input type="checkbox" name="evcil_hayvan" value="1" checked={!!f.evcil_hayvan} />Evcil hayvan</label>
-            <label class="kutu"><input type="checkbox" name="sadece_firsat" value="1" checked={!!f.sadece_firsat} />Sadece fırsatlar</label>
-          </div>
-          <div class="filtre-grup iki">
-            <label>Giriş<input type="date" name="giris_tarihi" value={f.giris_tarihi ?? ""} /></label>
-            <label>Çıkış<input type="date" name="cikis_tarihi" value={f.cikis_tarihi ?? ""} /></label>
-          </div>
-          <input type="hidden" name="siralama" value={f.siralama ?? ""} data-siralama-gizli />
-          <input type="hidden" name="sinir" value={f.sinir?.join(",") ?? ""} data-sinir-gizli />
-          <div class="panel-alt">
-            <button class="dugme tam">Uygula</button>
-            <a href="/ara" class="temizle">Filtreleri temizle</a>
-          </div>
-        </form>
-
-        <section class="ara-orta">
-          <div class="kum-kutu">
-            <AramaKutusu deger={metin} />
-            <div class="ornekler">{ORNEKLER.map((o) => <button type="button" class="ornek-cip" data-ornek={o}>{o}</button>)}</div>
-            <div class="ara-ozet" data-ozet hidden></div>
-          </div>
-          <div class="sonuc-bas">
-            <span data-sonuc-sayi>{sonuclar.length} ilan{f.sinir ? " · harita alanında" : ""}</span>
-            <div class="sonuc-sag">
-              <select data-siralama aria-label="Sıralama">
-                {[["onerilen", "Önerilen"], ["fiyat_artan", "Fiyat (artan)"], ["fiyat_azalan", "Fiyat (azalan)"], ["en_yeni", "En yeni"], ["en_firsat", "En fırsat"]]
-                  .map(([k, v]) => <option value={k} selected={(f.siralama ?? "onerilen") === k}>{v}</option>)}
-              </select>
-              <button type="button" class="filtre-ac" data-filtre-ac><Ayar boyut={16} /> Filtreler</button>
-            </div>
-          </div>
-          <div class="harita-kart mobil-harita"><HaritaUstu /><div class="harita" data-harita></div></div>
-          <div data-sonuc-alani>
-          {sonuclar.length === 0 && (
-            <div class="bos">
-              <p>Bu kriterlere uyan ilan yok.</p>
-              {oneri && <p><strong>{oneri.alan}</strong> kriterini gevşetirseniz {oneri.sayi} ilan çıkıyor.</p>}
-              <a href="/sihirbaz" class="dugme ikincil">Sihirbazla yeniden dene</a>
-            </div>
-          )}
-          <div class="kartlar iki-sutun">{sonuclar.map((i) => <IlanKarti i={i} />)}</div>
-          <script type="application/json" data-noktalar>{json(sonuclar.filter((i) => i.lat).map((i) => ({
-            lat: i.lat, lng: i.lng, no: i.ilan_no, baslik: i.baslik, fiyat: fiyatMetni(i),
-            kisa: kisaFiyat(i.fiyat_birimi === "gecelik" ? i.donem_fiyati : i.fiyat, i.para_birimi),
-          })))}</script>
-          </div>
-        </section>
-
-        <aside class="ara-harita">
-          <div class="harita-kart"><HaritaUstu /><div class="harita" data-harita></div></div>
-        </aside>
-      </div>
-      <script id="filtreler" type="application/json">{json(f)}</script>
-    </Sayfa>,
-  );
-});
-
 // ---------- İlan detay ----------
 site.get("/ilan/:no{[0-9]+}", async (c) => {
   const no = Number(c.req.param("no"));
@@ -227,9 +147,16 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
   const evetHayir = (x: boolean | null) => (x == null ? "—" : x ? "Evet" : "Hayır");
 
   const ozellikler: [string, unknown][] = [
-    ["Emlak türü", TUR_ETIKET[i.emlak_turu]], ["Oda", i.oda], ["Net m²", i.net_m2],
+    ["Konut tipi", etiket(KONUT_TIPLERI, i.emlak_turu) ?? TUR_ETIKET[i.emlak_turu]], ["Oda", i.oda], ["Net m²", i.net_m2],
     ["Brüt m²", i.brut_m2], ["Banyo", i.banyo], ["Bina yaşı", i.bina_yasi],
-    ["Kapasite", i.yatak_kapasitesi ? `${i.yatak_kapasitesi} kişi` : null], ["Kat", i.kat], ["Minimum gece", i.min_gece],
+    ["Kat sayısı", i.kat_sayisi], ["Bulunduğu kat", i.kat == null ? null : i.kat === 0 ? "Bahçe / zemin" : i.kat],
+    ["Isıtma", etiket(ISITMA, i.isitma)], ["Mutfak", etiket(MUTFAK, i.mutfak)],
+    ["Balkon", i.balkon == null ? null : evetHayir(i.balkon)], ["Asansör", i.asansor == null ? null : evetHayir(i.asansor)],
+    ["Kullanım durumu", etiket(YAPI_DURUMU, i.yapi_durumu)], ["Tapu durumu", etiket(TAPU, i.tapu_durumu)],
+    ["Kimden", etiket(KIMDEN, i.ilan_veren)], ["Cephe", i.cephe?.length ? i.cephe.map((c: string) => etiket(CEPHE, c)).join(", ") : null],
+    ["Özel alan", i.ozel_alan == null ? null : evetHayir(i.ozel_alan)],
+    ["Kapasite", i.yatak_kapasitesi ? `${i.yatak_kapasitesi} kişi` : null], ["Minimum gece", i.min_gece],
+    ["İlan tarihi", i.yayinlandi_at ? new Date(i.yayinlandi_at).toLocaleDateString("tr-TR") : null],
     ["Site içi", evetHayir(i.site_ici)], ["Havuz", { ozel: "Özel", ortak: "Ortak", yok: "Yok" }[i.havuz as string]],
     ["Deniz manzarası", evetHayir(i.deniz_manzarasi)], ["Denize mesafe", i.denize_mesafe_m ? `${i.denize_mesafe_m} m` : null],
     ["Eşyalı", evetHayir(i.esyali)], ["Otopark", evetHayir(i.otopark)], ["Evcil hayvan", evetHayir(i.evcil_hayvan)],
@@ -245,7 +172,13 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
           {i.iskonto >= 0.15 && <span class="rozet rozet-firsat">Bölge ortalamasının %{Math.round(i.iskonto * 100)} altında</span>}
           <span class="ilan-no">#{i.ilan_no}</span>
         </div>
-        <h1>{i.baslik}</h1>
+        <div class="ilan-baslik-satir">
+          <h1>{i.baslik}</h1>
+          <button type="button" class="kaydet-dugme" data-kaydet-ilan={i.ilan_no} aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+            <span data-yazi>Kaydet</span>
+          </button>
+        </div>
         <a href={`/mahalle/${i.mahalle_slug}`} class="ilan-yer"><Konum boyut={16} />{i.mahalle}, {i.ilce}</a>
 
         <div class="ilan-govde">
@@ -268,6 +201,14 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
             <dl class="ozellik-kart">
               {ozellikler.filter(([, v]) => v != null && v !== "").map(([k, v]) => <div><dt>{k}</dt><dd>{String(v)}</dd></div>)}
             </dl>
+
+            {OZELLIK_GRUPLARI.filter((g) => g.secenekler.some((o) => i.ozellikler?.includes(o.k))).map((g) => (
+              <div class="ozellik-grup">
+                <h3>{g.baslik}</h3>
+                <ul>{g.secenekler.filter((o) => i.ozellikler.includes(o.k)).map((o) => <li>✓ {o.e}</li>)}</ul>
+              </div>
+            ))}
+            {i.video_url && <p><a href={i.video_url} target="_blank" rel="noopener" class="dugme ikincil">▶ İlan videosunu izle</a></p>}
 
             <h2>Konum</h2>
             <div class="harita-kart"><div class="harita ilan-harita" data-harita></div></div>

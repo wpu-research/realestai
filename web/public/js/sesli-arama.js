@@ -1,55 +1,53 @@
-// Ana sayfa ve /ara: tek cümleyle (sesli ya da yazılı) arama → filtreler → /ara.
+// Arama kutusu: yazınca kelimeyle arar (normal form gönderimi); mikrofon ve örnek cümleler
+// "detaylı sesli arama"dır — konuşulan cümle yapay zekâyla filtrelere çevrilir.
 import { dinle, KonusmaTanima, postJson } from "./ortak.js";
 
-const form = document.querySelector("[data-sesli-arama]");
-if (form) {
-  const girdi = form.querySelector("input[name=q]");
-  const mikrofon = form.querySelector("[data-mikrofon]");
-  const durum = form.querySelector("[data-durum]");
+const kutu = document.querySelector("[data-sesli-arama]");
+if (kutu) {
+  const girdi = kutu.querySelector("input");
+  const mikrofon = kutu.querySelector("[data-mikrofon]");
+  const durum = kutu.querySelector("[data-durum]");
   const onceki = (() => {
     try { return JSON.parse(document.getElementById("filtreler")?.textContent || "null"); } catch { return null; }
   })();
 
-  async function ara(metin) {
+  async function detayliAra(metin) {
     if (!metin.trim()) return;
     durum.textContent = "Anlıyorum…";
-    form.classList.add("bekliyor");
+    kutu.classList.add("bekliyor");
     try {
-      const j = await postJson("/api/sesli-arama", {
-        metin, dil: "tr", onceki: onceki && Object.keys(onceki).length ? onceki : undefined,
-      });
-      if (j.anlasilmadi) {
-        durum.textContent = j.ozet;
-        form.classList.remove("bekliyor");
-        return;
-      }
+      const temiz = onceki && Object.keys(onceki).length ? { ...onceki, kelime: undefined, sinir: undefined } : undefined;
+      const j = await postJson("/api/sesli-arama", { metin, dil: "tr", onceki: temiz });
+      if (j.anlasilmadi) { durum.textContent = j.ozet; return; }
       try { sessionStorage.setItem("aramaOzeti", j.ozet); } catch {}
-      location.href = j.url + (j.url.includes("?") ? "&" : "?") + "q=" + encodeURIComponent(metin);
+      location.href = j.url;
     } catch {
-      durum.textContent = "Aramanızı anlayamadık, filtrelerden seçebilirsiniz.";
-      form.classList.remove("bekliyor");
-      document.querySelector("[data-filtre-panel]")?.classList.add("acik");
+      durum.textContent = "Detaylı arama şu an kullanılamıyor; kelimeyle aramayı deneyin.";
+    } finally {
+      kutu.classList.remove("bekliyor");
     }
   }
-
-  form.addEventListener("submit", (e) => { e.preventDefault(); ara(girdi.value); });
 
   if (KonusmaTanima) {
     mikrofon.hidden = false;
     mikrofon.addEventListener("click", () => {
-      if (form.classList.contains("dinliyor")) return;
-      form.classList.add("dinliyor");
-      durum.textContent = "Dinliyorum…";
+      if (kutu.classList.contains("dinliyor")) return;
+      kutu.classList.add("dinliyor");
+      durum.textContent = "Dinliyorum… aradığınız evi anlatın.";
       dinle({
         araSonuc: (m) => (girdi.value = m),
-        bitti: (m) => { form.classList.remove("dinliyor"); durum.textContent = ""; if (m) ara(m); },
-        hata: () => { form.classList.remove("dinliyor"); durum.textContent = "Mikrofona erişilemedi, yazarak arayabilirsiniz."; },
+        bitti: (m) => { kutu.classList.remove("dinliyor"); durum.textContent = ""; if (m) detayliAra(m); },
+        hata: () => { kutu.classList.remove("dinliyor"); durum.textContent = "Mikrofona erişilemedi, yazarak arayabilirsiniz."; },
       });
     });
   }
 
   document.querySelectorAll("[data-ornek]").forEach((b) =>
-    b.addEventListener("click", () => { girdi.value = b.dataset.ornek; ara(b.dataset.ornek); }));
+    b.addEventListener("click", () => { girdi.value = b.dataset.ornek; detayliAra(b.dataset.ornek); }));
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-detayli-dene]");
+    if (b) detayliAra(b.dataset.detayliDene);
+  });
 
   // /ara: yönlendirmeden önce saklanan özet balonu.
   const ozetEl = document.querySelector("[data-ozet]");

@@ -10,6 +10,7 @@ import { cikisYap, ekipGerekli, girisYap, sifreHashle, type Ortam } from "../aut
 import { SITE_ADI, UPLOAD_DIZIN } from "../config.js";
 import { sql } from "../db.js";
 import { csvOku } from "../lib/csv.js";
+import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_ANAHTARLARI, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 import {
   ADAY_DURUM_ETIKET, BAYRAK_ETIKET, fiyatMetni, ODA_ETIKET, para, tarih, TIP_ETIKET, TUR_ETIKET, yuzde,
 } from "../lib/bicim.js";
@@ -81,6 +82,7 @@ function AdminSayfa({ baslik, children, menu = true, kullanici, scriptler = [] }
 
 const s = (b: Record<string, unknown>, k: string) =>
   typeof b[k] === "string" && (b[k] as string).trim() ? (b[k] as string).trim() : null;
+const coklu = (b: Record<string, unknown>, k: string) => ([] as unknown[]).concat(b[k] ?? []).filter((x): x is string => typeof x === "string" && !!x);
 const n = (b: Record<string, unknown>, k: string) => {
   const v = s(b, k);
   return v == null || !Number.isFinite(Number(v.replace(",", "."))) ? null : Number(v.replace(",", "."));
@@ -430,7 +432,7 @@ admin.get("/ilan/:id", async (c) => {
             <h2>Bilgiler</h2>
             <div class="iki">
               <label>Tip<select name="tip">{Object.entries(TIP_ETIKET).map(([k, e]) => <option value={k} selected={i.tip === k}>{e}</option>)}</select></label>
-              <label>Tür<select name="emlak_turu">{Object.entries(TUR_ETIKET).map(([k, e]) => <option value={k} selected={i.emlak_turu === k}>{e}</option>)}</select></label>
+              <label>Konut tipi<select name="emlak_turu">{[...KONUT_TIPLERI, { k: "arsa", e: "Arsa" }, { k: "diger", e: "Diğer" }].map((o) => <option value={o.k} selected={i.emlak_turu === o.k}>{o.e}</option>)}</select></label>
             </div>
             <label>Başlık<input name="baslik" value={i.baslik} required /></label>
             <label>Açıklama<textarea name="aciklama" rows={6}>{i.aciklama}</textarea></label>
@@ -446,11 +448,31 @@ admin.get("/ilan/:id", async (c) => {
               <label>Denize mesafe (m)<input name="denize_mesafe_m" value={v(i.denize_mesafe_m)} /></label>
               <label>Havuz<select name="havuz">{["yok", "ortak", "ozel"].map((h) => <option selected={i.havuz === h}>{h}</option>)}</select></label>
             </div>
+            <div class="uc">
+              <label>Kat sayısı (bina)<input name="kat_sayisi" value={v(i.kat_sayisi)} /></label>
+              {([["isitma", "Isıtma", ISITMA], ["mutfak", "Mutfak", MUTFAK], ["yapi_durumu", "Kullanım durumu", YAPI_DURUMU],
+                 ["tapu_durumu", "Tapu durumu", TAPU], ["ilan_veren", "Kimden", KIMDEN]] as const).map(([ad, et, liste]) => (
+                <label>{et}<select name={ad}><option value="">—</option>{liste.map((o) => <option value={o.k} selected={i[ad] === o.k}>{o.e}</option>)}</select></label>
+              ))}
+              <label>Video bağlantısı<input name="video_url" value={v(i.video_url)} placeholder="https://…" /></label>
+            </div>
             <div class="secim-satir">
-              {[["site_ici", "Site içi"], ["deniz_manzarasi", "Deniz manzarası"], ["esyali", "Eşyalı"], ["otopark", "Otopark"], ["evcil_hayvan", "Evcil hayvan kabul"]].map(([k, e]) => (
+              {[["site_ici", "Site içi"], ["ozel_alan", "Özel alanı var"], ["deniz_manzarasi", "Deniz manzarası"], ["esyali", "Eşyalı"], ["otopark", "Otopark"],
+                ["balkon", "Balkon"], ["asansor", "Asansör"], ["evcil_hayvan", "Evcil hayvan kabul"]].map(([k, e]) => (
                 <label class="kutu"><input type="checkbox" name={k} value="1" checked={!!i[k]} />{e}</label>
               ))}
             </div>
+            <fieldset><legend>Cephe</legend><div class="secim-satir">
+              {CEPHE.map((o) => <label class="kutu"><input type="checkbox" name="cephe" value={o.k} checked={i.cephe?.includes(o.k)} />{o.e}</label>)}
+            </div></fieldset>
+            <fieldset><legend>Kesin konum (boş bırakılırsa mahalle merkezi kullanılır)</legend>
+              <div class="iki"><label>Enlem<input name="lat" value={v(i.lat)} placeholder="37.0331" /></label><label>Boylam<input name="lng" value={v(i.lng)} placeholder="27.3870" /></label></div>
+            </fieldset>
+            {OZELLIK_GRUPLARI.map((g) => (
+              <fieldset><legend>{g.baslik}</legend><div class="secim-satir">
+                {g.secenekler.map((o) => <label class="kutu"><input type="checkbox" name="ozellikler" value={o.k} checked={i.ozellikler?.includes(o.k)} />{o.e}</label>)}
+              </div></fieldset>
+            ))}
             <h2>Fiyat</h2>
             <div class="uc">
               <label>Fiyat<input name="fiyat" value={v(i.fiyat)} required /></label>
@@ -557,7 +579,7 @@ admin.get("/ilan/:id", async (c) => {
 
 admin.post("/ilan/:id", async (c) => {
   const id = c.req.param("id");
-  const b = await c.req.parseBody();
+  const b = await c.req.parseBody({ all: true });   // çoklu kutular (cephe, özellikler) dizi gelir
   const [i] = await sql`select ceviriler, tip from ilanlar where id = ${id}`;
   if (!i) return c.notFound();
   const ceviriler = { ...(i.ceviriler ?? {}) };
@@ -578,7 +600,12 @@ admin.post("/ilan/:id", async (c) => {
       sezon_fiyatlari = ${sf.some((x) => x != null) ? sql.json({ yuksek: sf[0], omuz: sf[1], dusuk: sf[2] }) : null},
       min_gece = ${n(b, "min_gece")}, sezon_baslangic = ${s(b, "sezon_baslangic")}, sezon_bitis = ${s(b, "sezon_bitis")},
       kira_suresi_gun = ${n(b, "kira_suresi_gun")}, eids_no = ${s(b, "eids_no")}, turizm_izin_no = ${s(b, "turizm_izin_no")},
-      bayraklar_incelendi = ${b.bayraklar_incelendi === "1"}, ceviriler = ${sql.json(ceviriler)}
+      bayraklar_incelendi = ${b.bayraklar_incelendi === "1"}, ceviriler = ${sql.json(ceviriler)},
+      kat_sayisi = ${n(b, "kat_sayisi")}, isitma = ${s(b, "isitma")}, mutfak = ${s(b, "mutfak")},
+      yapi_durumu = ${s(b, "yapi_durumu")}, tapu_durumu = ${s(b, "tapu_durumu")}, ilan_veren = ${s(b, "ilan_veren") ?? "sahibinden"},
+      video_url = ${s(b, "video_url")}, balkon = ${b.balkon === "1"}, asansor = ${b.asansor === "1"}, ozel_alan = ${b.ozel_alan === "1"},
+      cephe = ${coklu(b, "cephe")}::text[], ozellikler = ${coklu(b, "ozellikler").filter((x) => OZELLIK_ANAHTARLARI.includes(x))}::text[],
+      lat = ${n(b, "lat")}, lng = ${n(b, "lng")}, kesin_konum = ${n(b, "lat") != null && n(b, "lng") != null}
       where id = ${id}`;
     return c.redirect(`/admin/ilan/${id}?ok=1`);
   } catch (e) {
@@ -765,6 +792,7 @@ admin.get("/talepler", async (c) => {
             <div class="baslik-satir"><strong>{t.ad_soyad}</strong><span class="durum">{t.durum}</span></div>
             <p>{t.telefon && <a href={`tel:${t.telefon}`}>{t.telefon}</a>}{t.eposta && ` · ${t.eposta}`} · {tarih(t.created_at)}</p>
             {t.ilan_no && <p>İlan: <a href={`/ilan/${t.ilan_no}`} target="_blank">#{t.ilan_no} {t.baslik}</a></p>}
+            {t.konu === "emlakci_bul" && <p><span class="etiket mavi">Bana emlakçı bul</span> {[t.ayrinti?.istek, t.ayrinti?.bolge, t.ayrinti?.butce, t.ayrinti?.zaman].filter(Boolean).join(" · ")}</p>}
             {t.giris_tarihi && <p>{new Date(t.giris_tarihi).toLocaleDateString("tr-TR")} – {t.cikis_tarihi ? new Date(t.cikis_tarihi).toLocaleDateString("tr-TR") : "?"} · {t.kisi_sayisi ?? "?"} kişi</p>}
             {t.mesaj && <p class="not">{t.mesaj}</p>}
             <form method="post" action={`/admin/talep/${t.id}`} class="satir-form">

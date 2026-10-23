@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { asistan, sesliArama, type AsistanMesaj } from "../ai/claude.js";
 import { sql } from "../db.js";
-import { filtreUrl, ilanAra, type Filtreler } from "../lib/arama.js";
+import { filtreUrl, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
+import { IlanKarti } from "../views/layout.js";
 
 export const api = new Hono();
 
@@ -67,4 +68,23 @@ api.post("/sihirbaz-oturum", async (c) => {
   await sql`insert into asistan_oturumlari (kanal, filtreler, tamamlandi, adim_sayisi, sonuc_sayisi)
             values ('sihirbaz', ${sql.json(filtreler)}, ${!!tamamlandi}, ${Number(adim_sayisi) || 0}, ${sonuc_sayisi})`;
   return c.json({ ok: true });
+});
+
+// Favori sayacı (anonim; hangi ilan kaç kez kaydedildi). Kayıtların kendisi tarayıcıda.
+api.post("/favori", async (c) => {
+  const { no, artis } = await c.req.json<{ no?: number; artis?: number }>();
+  if (!Number.isInteger(no) || (artis !== 1 && artis !== -1)) return c.json({ hata: "geçersiz" }, 400);
+  await sql`insert into favori_sayaci (ilan_id, adet)
+            select id, greatest(${artis}, 0) from ilanlar where ilan_no = ${no!}
+            on conflict (ilan_id) do update set adet = greatest(favori_sayaci.adet + ${artis}, 0)`;
+  return c.json({ ok: true });
+});
+
+// Kaydedilenler sayfası için ilan kartları (HTML), ilan numarası sırasıyla.
+api.get("/kartlar", async (c) => {
+  const nolar = (c.req.query("no") ?? "").split(",").map(Number).filter((x) => Number.isInteger(x) && x > 0).slice(0, 200);
+  if (!nolar.length) return c.html("");
+  const kartlar = (await ilanAra({}, { limit: 500 }) as IlanKart[]).filter((i) => nolar.includes(i.ilan_no))
+    .sort((a, b) => nolar.indexOf(a.ilan_no) - nolar.indexOf(b.ilan_no));
+  return c.html(<>{kartlar.map((i) => <IlanKarti i={i} />)}</>);
 });

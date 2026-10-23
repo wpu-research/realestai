@@ -1,16 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { sql } from "../db.js";
 import type { Filtreler } from "../lib/arama.js";
+import { OZELLIK_ANAHTARLARI } from "../lib/ozellikler.js";
 
 const anthropic = new Anthropic();
 const MODEL = "claude-opus-5-5";
 
 const FILTRE_OZELLIKLERI = {
+  kategori: { type: "string", enum: ["konut", "arsa"] },
   tip: { type: "string", enum: ["satilik", "kiralik", "sezonluk", "gunluk"] },
   emlak_turu: {
     type: "array",
-    items: { type: "string", enum: ["daire", "villa", "mustakil", "rezidans", "arsa", "diger"] },
+    items: { type: "string", enum: ["daire", "villa", "dubleks", "tripleks", "tek_kat_villa", "mustakil", "rezidans", "arsa"] },
   },
+  ozellik: { type: "array", items: { type: "string", enum: OZELLIK_ANAHTARLARI } },
+  min_brut_m2: { type: "number" },
+  max_net_m2: { type: "number" },
+  kimden: { type: "array", items: { type: "string", enum: ["sahibinden", "emlakci"] } },
+  ilan_tarihi: { type: "integer" },
+  esya: { type: "string", enum: ["esyali", "esyasiz"] },
   mahalleler: { type: "array", items: { type: "string" } },
   min_fiyat: { type: "number" },
   max_fiyat: { type: "number" },
@@ -27,7 +35,7 @@ const FILTRE_OZELLIKLERI = {
   giris_tarihi: { type: "string", format: "date" },
   cikis_tarihi: { type: "string", format: "date" },
   sadece_firsat: { type: "boolean" },
-  siralama: { type: "string", enum: ["onerilen", "fiyat_artan", "fiyat_azalan", "en_yeni", "en_firsat"] },
+  siralama: { type: "string", enum: ["onerilen", "yeni", "eski", "fiyat_artan", "fiyat_azalan", "en_firsat"] },
 };
 const FILTRELER = { type: "object", additionalProperties: false, properties: FILTRE_OZELLIKLERI };
 
@@ -76,6 +84,11 @@ Kurallar:
 - "denize yakın" → max_denize_mesafe_m 500; "denize sıfır" → 100; "yürüme mesafesi" → 1000.
 - "6 kişilik", "iki aile" (≈ 6–8 kişi) → min_kapasite.
 - "ucuz", "fırsat", "piyasanın altında" → sadece_firsat true.
+- Konut tipi: dubleks, tripleks, tek katlı villa (tek_kat_villa), daire, villa, müstakil. "Arsa / tarla" → kategori arsa.
+- Özellikler (ozellik listesi, yalnız şu anahtarlar): ${OZELLIK_ANAHTARLARI.join(", ")}.
+  Örn. "şömineli" → somine, "jakuzili" → jakuzi, "okula yakın" → okul, "marinaya yakın" → marina,
+  "engelli/yaşlı için uygun" → engelli_yasli_uygun, "çocuklu aileye uygun" → cocuklu_uygun, "kedim/köpeğim var" → hayvanli_uygun.
+- "sahibinden" → kimden ["sahibinden"]. "son bir haftanın ilanları" → ilan_tarihi 7, siralama yeni. "eşyasız" → esya esyasiz.
 - Belirsiz tarih ("ağustosta bir hafta") → ayın ilk haftasını varsay ve ozet içinde belirt.
 - mahalleler: yalnız aşağıdaki listeden slug kullan. "Bodrum merkez" → merkez.
 - Önceki filtreler verilmişse yeni mesaj bir düzeltmedir: önceki filtreleri koru, yalnız istenen
