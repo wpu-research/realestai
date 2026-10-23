@@ -341,3 +341,18 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
   .asistan-balon { padding: 6px; }
   .sihirbaz { padding: 22px; }
 }
+
+/* ---------- Harita: fiyat etiketleri ve "kaydırınca ara" ---------- */
+.harita-kart { position: relative; }
+.harita-ustu { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex; gap: 8px; }
+.harita-secim { flex-direction: row; align-items: center; gap: 8px; background: var(--card); border-radius: 999px; padding: 7px 14px;
+  font-size: .82rem; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,.15); cursor: pointer; white-space: nowrap; }
+.harita-bu-alan { background: var(--foreground); color: #fff; border: 0; border-radius: 999px; padding: 8px 16px; font: 600 .82rem var(--sans); box-shadow: 0 2px 10px rgba(0,0,0,.2); cursor: pointer; }
+.fiyat-isaret { background: none; border: 0; }
+.fiyat-isaret span { display: inline-block; transform: translate(-50%, -50%); background: var(--card); color: var(--foreground); border-radius: 999px;
+  padding: 4px 9px; font: 700 .75rem var(--sans); white-space: nowrap; box-shadow: 0 1px 6px rgba(0,0,0,.25); border: 1px solid var(--border); transition: transform .15s, background .15s; }
+.fiyat-isaret:hover span, .fiyat-isaret.vurgulu span { background: var(--foreground); color: #fff; transform: translate(-50%, -50%) scale(1.12); }
+.fiyat-isaret.vurgulu { z-index: 1000 !important; }
+[data-sonuc-alani] { transition: opacity .2s; }
+[data-sonuc-alani].yukleniyor { opacity: .45; pointer-events: none; }
+.ara-harita .harita-kart .harita { height: calc(100vh - 110px); }

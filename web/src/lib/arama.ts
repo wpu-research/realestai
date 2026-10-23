@@ -21,6 +21,8 @@ export type Filtreler = {
   cikis_tarihi?: string;
   sadece_firsat?: boolean;
   siralama?: "onerilen" | "fiyat_artan" | "fiyat_azalan" | "en_yeni" | "en_firsat";
+  // Harita alanı (Airbnb gibi): [güney, batı, kuzey, doğu]
+  sinir?: [number, number, number, number];
 };
 
 const DIZI = ["emlak_turu", "mahalleler", "oda"] as const;
@@ -48,6 +50,8 @@ export function filtreOku(q: URLSearchParams): Filtreler {
   }
   for (const k of MANTIK) if (q.get(k) === "1" || q.get(k) === "true") f[k] = true;
   for (const k of METIN) if (q.get(k)) f[k] = q.get(k);
+  const sinir = (q.get("sinir") ?? "").split(",").map(Number);
+  if (sinir.length === 4 && sinir.every(Number.isFinite) && sinir[0] < sinir[2] && sinir[1] < sinir[3]) f.sinir = sinir;
   return f as Filtreler;
 }
 
@@ -55,7 +59,7 @@ export function filtreUrl(f: Filtreler): string {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(f)) {
     if (v == null || v === false || v === "" || (Array.isArray(v) && !v.length)) continue;
-    q.set(k, Array.isArray(v) ? v.join(",") : v === true ? "1" : String(v));
+    q.set(k, Array.isArray(v) ? v.map((x) => (typeof x === "number" ? x.toFixed(5) : x)).join(",") : v === true ? "1" : String(v));
   }
   return q.toString();
 }
@@ -103,7 +107,9 @@ export async function ilanAra(f: Filtreler, opt: { limit?: number; sayim?: boole
     ${f.site_ici ? sql`and i.site_ici` : sql``}
     ${f.esyali ? sql`and i.esyali` : sql``}
     ${f.evcil_hayvan ? sql`and i.evcil_hayvan` : sql``}
-    ${f.sadece_firsat ? sql`and i.iskonto >= 0.15` : sql``}`;
+    ${f.sadece_firsat ? sql`and i.iskonto >= 0.15` : sql``}
+    ${f.sinir ? sql`and coalesce(i.lat, m.lat) between ${f.sinir[0]} and ${f.sinir[2]}
+                    and coalesce(i.lng, m.lng) between ${f.sinir[1]} and ${f.sinir[3]}` : sql``}`;
 
   if (opt.sayim) {
     const [r] = await sql<{ n: number }[]>`
@@ -137,6 +143,7 @@ export async function ilanAra(f: Filtreler, opt: { limit?: number; sayim?: boole
 // 0 sonuçta hangi kriteri gevşetmeyi önereceğimiz: sırayla kaldırıp sonuç çıkan ilkini döndür.
 export async function gevsetmeOnerisi(f: Filtreler): Promise<{ alan: string; sayi: number } | null> {
   const adaylar: [string, (keyof Filtreler)[]][] = [
+    ["harita alanı", ["sinir"]],
     ["bütçe", ["max_fiyat", "min_fiyat"]],
     ["bölge", ["mahalleler"]],
     ["oda sayısı", ["oda"]],

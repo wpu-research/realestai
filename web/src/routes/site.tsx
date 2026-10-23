@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
-import { fiyatMetni, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
+import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
 import { Ara, Ayar, Konum, Mikrofon, Ok, Onay } from "../views/ikon.js";
 import { IlanKarti, json, ornekGorsel, Sayfa } from "../views/layout.js";
 
@@ -94,6 +94,13 @@ site.get("/", async (c) => {
 });
 
 // ---------- Arama ----------
+// Airbnb gibi: haritayı kaydırınca/yakınlaştırınca liste görünen alana göre yenilenir.
+const HaritaUstu = () => (
+  <div class="harita-ustu">
+    <label class="harita-secim"><input type="checkbox" data-kaydirinca-ara checked />Haritayı kaydırınca ara</label>
+    <button type="button" class="harita-bu-alan" data-bu-alanda-ara hidden>Bu alanda ara</button>
+  </div>
+);
 site.get("/ara", async (c) => {
   const q = new URL(c.req.url).searchParams;
   const f = filtreOku(q);
@@ -155,6 +162,7 @@ site.get("/ara", async (c) => {
             <label>Çıkış<input type="date" name="cikis_tarihi" value={f.cikis_tarihi ?? ""} /></label>
           </div>
           <input type="hidden" name="siralama" value={f.siralama ?? ""} data-siralama-gizli />
+          <input type="hidden" name="sinir" value={f.sinir?.join(",") ?? ""} data-sinir-gizli />
           <div class="panel-alt">
             <button class="dugme tam">Uygula</button>
             <a href="/ara" class="temizle">Filtreleri temizle</a>
@@ -168,7 +176,7 @@ site.get("/ara", async (c) => {
             <div class="ara-ozet" data-ozet hidden></div>
           </div>
           <div class="sonuc-bas">
-            <span>{sonuclar.length} ilan</span>
+            <span data-sonuc-sayi>{sonuclar.length} ilan{f.sinir ? " · harita alanında" : ""}</span>
             <div class="sonuc-sag">
               <select data-siralama aria-label="Sıralama">
                 {[["onerilen", "Önerilen"], ["fiyat_artan", "Fiyat (artan)"], ["fiyat_azalan", "Fiyat (azalan)"], ["en_yeni", "En yeni"], ["en_firsat", "En fırsat"]]
@@ -177,7 +185,8 @@ site.get("/ara", async (c) => {
               <button type="button" class="filtre-ac" data-filtre-ac><Ayar boyut={16} /> Filtreler</button>
             </div>
           </div>
-          <div class="harita-kart mobil-harita"><div class="harita" data-harita></div></div>
+          <div class="harita-kart mobil-harita"><HaritaUstu /><div class="harita" data-harita></div></div>
+          <div data-sonuc-alani>
           {sonuclar.length === 0 && (
             <div class="bos">
               <p>Bu kriterlere uyan ilan yok.</p>
@@ -186,15 +195,17 @@ site.get("/ara", async (c) => {
             </div>
           )}
           <div class="kartlar iki-sutun">{sonuclar.map((i) => <IlanKarti i={i} />)}</div>
+          <script type="application/json" data-noktalar>{json(sonuclar.filter((i) => i.lat).map((i) => ({
+            lat: i.lat, lng: i.lng, no: i.ilan_no, baslik: i.baslik, fiyat: fiyatMetni(i),
+            kisa: kisaFiyat(i.fiyat_birimi === "gecelik" ? i.donem_fiyati : i.fiyat, i.para_birimi),
+          })))}</script>
+          </div>
         </section>
 
         <aside class="ara-harita">
-          <div class="harita-kart"><div class="harita" data-harita></div></div>
+          <div class="harita-kart"><HaritaUstu /><div class="harita" data-harita></div></div>
         </aside>
       </div>
-      <script id="noktalar" type="application/json">{json(sonuclar.filter((i) => i.lat).map((i) => ({
-        lat: i.lat, lng: i.lng, no: i.ilan_no, baslik: i.baslik, fiyat: fiyatMetni(i),
-      })))}</script>
       <script id="filtreler" type="application/json">{json(f)}</script>
     </Sayfa>,
   );

@@ -44,3 +44,12 @@ export function tarih(d: Date | string | null | undefined): string {
   if (!d) return "—";
   return new Date(d).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Istanbul" });
 }
+
+// Harita fiyat etiketi için kısa biçim: 9,2 Mn ₺ · 45 B ₺ · 4.500 ₺
+export function kisaFiyat(tutar: number, birim = "TRY"): string {
+  const sembol = { TRY: "₺", EUR: "€", USD: "$", GBP: "£" }[birim] ?? birim;
+  const f = (x: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(x);
+  if (tutar >= 1e6) return `${f(tutar / 1e6)} Mn ${sembol}`;
+  if (tutar >= 1e5) return `${f(tutar / 1e3)} B ${sembol}`;
+  return `${new Intl.NumberFormat("tr-TR").format(Math.round(tutar))} ${sembol}`;
+}
