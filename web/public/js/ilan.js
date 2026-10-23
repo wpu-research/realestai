@@ -1,14 +1,11 @@
 import { haritaKur } from "./ortak.js";
 
-const harita = document.getElementById("harita");
-if (harita) haritaKur(harita, JSON.parse(harita.dataset.noktalar || "[]"), { yakin: true });
+haritaKur(document.querySelector("[data-harita]"), JSON.parse(document.getElementById("noktalar")?.textContent || "[]"), { yakin: true });
 
-// Galeri: oda sekmeleri
-const galeri = document.querySelector("[data-galeri]");
-galeri?.querySelectorAll("[data-oda]").forEach((b) =>
+// Galeri: küçük resme tıklayınca büyük görsel değişir.
+const ana = document.querySelector("[data-ana]");
+document.querySelectorAll("[data-foto]").forEach((b) =>
   b.addEventListener("click", () => {
-    galeri.querySelectorAll("[data-oda]").forEach((x) => x.classList.toggle("aktif", x === b));
-    galeri.querySelectorAll("[data-oda-etiket]").forEach((a) => {
-      a.hidden = !!b.dataset.oda && a.dataset.odaEtiket !== b.dataset.oda;
-    });
+    ana.src = b.dataset.foto;
+    document.querySelectorAll("[data-foto]").forEach((x) => x.classList.toggle("aktif", x === b));
   }));

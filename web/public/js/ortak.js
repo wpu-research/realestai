@@ -59,7 +59,8 @@ export function haritaKur(el, noktalar, { yakin = false } = {}) {
   }).addTo(harita);
   const sinir = [];
   for (const n of noktalar) {
-    const m = L.marker([n.lat, n.lng]).addTo(harita);
+    // Lovable tasarımındaki pembe yuvarlak işaret
+    const m = L.circleMarker([n.lat, n.lng], { radius: 9, color: "#ffffff", weight: 2, fillColor: "#b8125a", fillOpacity: 0.9 }).addTo(harita);
     if (n.no) m.bindPopup(`<a href="/ilan/${n.no}"><strong>${escape(n.baslik)}</strong></a><br>${escape(n.fiyat ?? "")}`);
     else if (n.baslik) m.bindPopup(escape(n.baslik));
     sinir.push([n.lat, n.lng]);

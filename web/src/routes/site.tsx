@@ -1,28 +1,28 @@
 import { Hono } from "hono";
 import { sql } from "../db.js";
-import { filtreOku, gevsetmeOnerisi, ilanAra, type IlanKart } from "../lib/arama.js";
+import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { fiyatMetni, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
-import { IlanKarti, json, Sayfa } from "../views/layout.js";
+import { Ara, Ayar, Konum, Mikrofon, Ok, Onay } from "../views/ikon.js";
+import { IlanKarti, json, ornekGorsel, Sayfa } from "../views/layout.js";
 
 export const site = new Hono();
 
 type Mahalle = { id: number; slug: string; ad: string; ilce: string; segment: string; lat: number; lng: number; kiyi: boolean };
-const mahalleler = () => sql<Mahalle[]>`select id, slug, ad, ilce, segment, lat, lng, kiyi from mahalleler order by ilce, ad`;
+const mahalleler = () => sql<Mahalle[]>`select id, slug, ad, ilce, segment, lat, lng, kiyi from mahalleler order by ad`;
 
 const ORNEKLER = [
   "Bitez'de denize yakın havuzlu 2+1 satılık",
   "Ağustosta 6 kişilik, gecesi 8 binin altında tatil evi",
-  "Konacık'ta yıllık kiralık 3+1",
+  "Konacık'ta yıllık kiralık 3+1, eşyasız",
   "Yalıkavak'ta sezonluk deniz manzaralı villa",
 ];
 
-function AramaKutusu({ deger = "", buyuk = false }: { deger?: string; buyuk?: boolean }) {
+function AramaKutusu({ deger = "", hero = false }: { deger?: string; hero?: boolean }) {
   return (
-    <form class={`arama-kutu ${buyuk ? "buyuk" : ""}`} data-sesli-arama action="/ara" method="get">
-      <input name="q" value={deger} placeholder="Ne arıyorsunuz? Örn. Bitez'de havuzlu 2+1 satılık" autocomplete="off" />
-      <button type="button" class="mikrofon" data-mikrofon aria-label="Sesli ara" hidden>
-        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
-      </button>
+    <form class={`arama-kutu ${hero ? "hero-arama" : ""}`} data-sesli-arama action="/ara" method="get">
+      <span class="arama-ikon"><Ara boyut={hero ? 20 : 18} /></span>
+      <input name="q" value={deger} placeholder="Örn. Bitez'de denize yakın havuzlu 2+1 satılık" autocomplete="off" />
+      <button type="button" class="mikrofon" data-mikrofon aria-label="Sesli ara" hidden><Mikrofon boyut={hero ? 20 : 18} /></button>
       <button type="submit" class="ara-dugme">Ara</button>
       <div class="arama-durum" data-durum></div>
     </form>
@@ -31,64 +31,62 @@ function AramaKutusu({ deger = "", buyuk = false }: { deger?: string; buyuk?: bo
 
 // ---------- Ana sayfa ----------
 site.get("/", async (c) => {
-  const [firsatlar, mh, sayilar] = await Promise.all([
+  const [firsatlar, mh] = await Promise.all([
     ilanAra({ siralama: "en_firsat" }, { limit: 6 }) as Promise<IlanKart[]>,
-    mahalleler(),
-    sql<{ tip: string; n: number }[]>`select tip, count(*)::int as n from ilanlar where durum = 'yayinda' group by tip`,
+    sql<(Mahalle & { n: number })[]>`
+      select m.slug, m.ad, m.ilce, count(i.id) filter (where i.durum = 'yayinda')::int as n
+      from mahalleler m left join ilanlar i on i.mahalle_id = m.id group by m.id order by m.ad`,
   ]);
-  const sayi = Object.fromEntries(sayilar.map((r) => [r.tip, r.n]));
   return c.html(
     <Sayfa scriptler={["/js/sesli-arama.js"]}>
       <section class="hero">
+        <img class="hero-gorsel" src="/img/hero-bodrum.jpg" alt="" fetchpriority="high" />
+        <div class="hero-perde"></div>
         <div class="kap hero-ic">
-          <h1>Bodrum'da evi <em>sahibinden</em>, doğru fiyattan bulun</h1>
-          <p>Yalnız sahibinin yetki verdiği, doğrulanmış ilanlar. Söyleyin, gerisini biz bulalım.</p>
-          <AramaKutusu buyuk />
-          <div class="ornekler">
-            {ORNEKLER.map((o) => <button type="button" class="cip" data-ornek={o}>{o}</button>)}
+          <h1>Bodrum'da ev, sahibinden.</h1>
+          <p>Sahibinin yetki verdiği, doğrulanmış ilanlar. Ne aradığınızı söyleyin, gerisini biz bulalım.</p>
+          <AramaKutusu hero />
+          <div class="hero-cipler">
+            {(["satilik", "kiralik", "sezonluk", "gunluk"] as const).map((t) => (
+              <a href={`/ara?tip=${t}`} class="cam-cip">{TIP_ETIKET[t]}</a>
+            ))}
           </div>
-          <div class="hero-alternatif">
-            <a href="/sihirbaz" class="dugme ikincil">Adım adım arayalım</a>
-            <a href="/asistan" class="dugme ikincil">Didem'le konuşarak ara</a>
+          <div class="hero-alt-link">
+            <a href="/sihirbaz">Adım adım arayalım</a><span>·</span><a href="/asistan">Didem'le konuşarak ara</a>
           </div>
         </div>
-      </section>
-
-      <section class="kap tipler">
-        {(["satilik", "kiralik", "sezonluk", "gunluk"] as const).map((t) => (
-          <a href={`/ara?tip=${t}`} class={`tip-karti tip-${t}`}>
-            <strong>{TIP_ETIKET[t]}</strong>
-            <span>{sayi[t] ?? 0} ilan</span>
-          </a>
-        ))}
       </section>
 
       <section class="kap bolum">
         <div class="bolum-bas">
           <h2>Haftanın fırsatları</h2>
-          <a href="/ara?siralama=en_firsat">Tümü →</a>
+          <a href="/ara?siralama=en_firsat" class="bolum-link">Tüm ilanlar <Ok boyut={14} /></a>
         </div>
-        <div class="kartlar">{firsatlar.map((i) => <IlanKarti i={i} />)}</div>
+        <div class="kartlar uc-sutun">{firsatlar.map((i) => <IlanKarti i={i} />)}</div>
+      </section>
+
+      <section class="kum-bolum">
+        <div class="kap bolum">
+          <h2>Mahalleler</h2>
+          <div class="mahalle-izgara">
+            {mh.map((m, k) => (
+              <a href={`/mahalle/${m.slug}`} class="mahalle-karo">
+                <img src={ornekGorsel(k)} alt="" loading="lazy" />
+                <div class="mahalle-perde"></div>
+                <div class="mahalle-yazi"><strong>{m.ad}</strong><span>{m.ilce} · {m.n}</span></div>
+              </a>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section class="kap bolum">
-        <h2>Mahalleler</h2>
-        <div class="mahalleler">
-          {mh.map((m) => (
-            <a href={`/mahalle/${m.slug}`} class="mahalle-karti">
-              <strong>{m.ad}</strong><span>{m.ilce}{m.kiyi ? " · kıyı" : ""}</span>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <section class="bant">
-        <div class="kap bant-ic">
+        <div class="cta-bant">
           <div>
             <h2>Evinizi ücretsiz listeleyin</h2>
-            <p>Türkçe, İngilizce, Rusça ve Almanca yayınlayalım; yerli ve yabancı alıcıya ulaştıralım.</p>
+            <p>Dört dilde yayınlayalım, yerli ve yabancı alıcılara ulaştıralım.</p>
           </div>
-          <a href="/evimi-listele" class="dugme">Evimi listele</a>
+          <a href="/evimi-listele" class="dugme vurgu">Başvur</a>
         </div>
       </section>
     </Sayfa>,
@@ -102,85 +100,84 @@ site.get("/ara", async (c) => {
   const metin = q.get("q") ?? "";
   const [sonuclar, mh] = await Promise.all([ilanAra(f) as Promise<IlanKart[]>, mahalleler()]);
   const oneri = sonuclar.length === 0 ? await gevsetmeOnerisi(f) : null;
-  const secili = (k: string, v: string) => (Array.isArray((f as any)[k]) ? (f as any)[k].includes(v) : (f as any)[k] === v);
+  const dizide = (k: keyof Filtreler, v: string) => ((f[k] as string[] | undefined) ?? []).includes(v);
+  const CipKutu = ({ ad, deger, etiket, secili, radyo }: { ad: string; deger: string; etiket: string; secili: boolean; radyo?: boolean }) => (
+    <label class="filtre-cip"><input type={radyo ? "radio" : "checkbox"} name={ad} value={deger} checked={secili} />{etiket}</label>
+  );
 
   return c.html(
-    <Sayfa baslik="Ara" harita scriptler={["/js/sesli-arama.js", "/js/ara.js"]}>
-      <div class="kap ara-ust">
-        <AramaKutusu deger={metin} />
-        <div class="ara-ozet" data-ozet hidden></div>
-        <div class="ara-linkler">
-          <a href="/sihirbaz">Sihirbazla yeniden ara</a> · <a href="/asistan">Didem'le konuş</a>
-          <button type="button" class="filtre-ac" data-filtre-ac>Filtreler</button>
-        </div>
-      </div>
-      <div class="kap ara-govde">
+    <Sayfa baslik="İlanlar" harita scriptler={["/js/sesli-arama.js", "/js/ara.js"]}>
+      <div class="ara-sayfa">
         <form class="filtre-panel" method="get" action="/ara" data-filtre-panel>
-          <div class="panel-bas"><strong>Filtreler</strong><button type="button" data-filtre-kapat>✕</button></div>
-          <label>Tip
-            <select name="tip">
-              <option value="">Hepsi</option>
-              {Object.entries(TIP_ETIKET).map(([k, v]) => <option value={k} selected={f.tip === k}>{v}</option>)}
-            </select>
-          </label>
-          <fieldset><legend>Mahalle</legend>
-            <div class="secim-izgara">
-              {mh.map((m) => (
-                <label class="kutu"><input type="checkbox" name="mahalleler" value={m.slug} checked={secili("mahalleler", m.slug)} />{m.ad}</label>
-              ))}
+          <div class="panel-bas"><span class="ust-etiket">Filtreler</span><button type="button" data-filtre-kapat aria-label="Kapat">✕</button></div>
+          <div class="filtre-grup"><h4>Tip</h4>
+            <div class="cipler">
+              <CipKutu ad="tip" deger="" etiket="Hepsi" secili={!f.tip} radyo />
+              {Object.entries(TIP_ETIKET).map(([k, v]) => <CipKutu ad="tip" deger={k} etiket={v} secili={f.tip === k} radyo />)}
             </div>
-          </fieldset>
-          <div class="iki">
-            <label>En az fiyat<input type="number" name="min_fiyat" value={f.min_fiyat ?? ""} min="0" /></label>
-            <label>En çok fiyat<input type="number" name="max_fiyat" value={f.max_fiyat ?? ""} min="0" /></label>
           </div>
-          <label>Para birimi
-            <select name="para_birimi">
-              {["TRY", "EUR", "USD", "GBP"].map((p) => <option selected={(f.para_birimi ?? "TRY") === p}>{p}</option>)}
-            </select>
-          </label>
-          <fieldset><legend>Oda</legend>
-            <div class="secim-satir">
-              {["1+1", "2+1", "3+1", "4+1"].map((o) => (
-                <label class="kutu"><input type="checkbox" name="oda" value={o} checked={secili("oda", o)} />{o === "4+1" ? "4+1 ve üzeri" : o}</label>
-              ))}
+          <div class="filtre-grup"><h4>Mahalle</h4>
+            <div class="cipler">{mh.map((m) => <CipKutu ad="mahalleler" deger={m.slug} etiket={m.ad} secili={dizide("mahalleler", m.slug)} />)}</div>
+          </div>
+          <div class="filtre-grup"><h4>Fiyat ({f.para_birimi ?? "TRY"})</h4>
+            <div class="iki">
+              <input type="number" name="min_fiyat" value={f.min_fiyat ?? ""} min="0" placeholder="Min" />
+              <input type="number" name="max_fiyat" value={f.max_fiyat ?? ""} min="0" placeholder="Maks" />
             </div>
-          </fieldset>
-          <div class="iki">
-            <label>En az m²<input type="number" name="min_net_m2" value={f.min_net_m2 ?? ""} min="0" /></label>
-            <label>Kişi sayısı<input type="number" name="min_kapasite" value={f.min_kapasite ?? ""} min="1" /></label>
+            <input type="hidden" name="para_birimi" value={f.para_birimi ?? ""} />
           </div>
-          <label>Havuz
-            <select name="havuz">
-              <option value="">Fark etmez</option>
-              <option value="herhangi" selected={f.havuz === "herhangi"}>Havuzlu</option>
-              <option value="ozel" selected={f.havuz === "ozel"}>Özel havuz</option>
-            </select>
-          </label>
-          <label>Denize en fazla (m)<input type="number" name="max_denize_mesafe_m" value={f.max_denize_mesafe_m ?? ""} min="0" step="100" /></label>
-          <div class="secim-satir">
+          <div class="filtre-grup"><h4>Oda</h4>
+            <div class="cipler">{["1+0", "1+1", "2+1", "3+1", "4+1", "5+1"].map((o) => <CipKutu ad="oda" deger={o} etiket={o} secili={dizide("oda", o)} />)}</div>
+          </div>
+          <div class="filtre-grup iki">
+            <label>Min m²<input type="number" name="min_net_m2" value={f.min_net_m2 ?? ""} min="0" /></label>
+            <label>Min kapasite<input type="number" name="min_kapasite" value={f.min_kapasite ?? ""} min="1" /></label>
+          </div>
+          <div class="filtre-grup"><h4>Havuz</h4>
+            <div class="cipler">
+              <CipKutu ad="havuz" deger="" etiket="Fark etmez" secili={!f.havuz} radyo />
+              <CipKutu ad="havuz" deger="ozel" etiket="Özel" secili={f.havuz === "ozel"} radyo />
+              <CipKutu ad="havuz" deger="ortak" etiket="Ortak" secili={f.havuz === "ortak"} radyo />
+            </div>
+          </div>
+          <div class="filtre-grup">
+            <label>Denize max (m)<input type="number" name="max_denize_mesafe_m" value={f.max_denize_mesafe_m ?? ""} min="0" step="100" /></label>
+          </div>
+          <div class="filtre-grup kutular">
             <label class="kutu"><input type="checkbox" name="deniz_manzarasi" value="1" checked={!!f.deniz_manzarasi} />Deniz manzarası</label>
             <label class="kutu"><input type="checkbox" name="site_ici" value="1" checked={!!f.site_ici} />Site içi</label>
             <label class="kutu"><input type="checkbox" name="esyali" value="1" checked={!!f.esyali} />Eşyalı</label>
             <label class="kutu"><input type="checkbox" name="evcil_hayvan" value="1" checked={!!f.evcil_hayvan} />Evcil hayvan</label>
             <label class="kutu"><input type="checkbox" name="sadece_firsat" value="1" checked={!!f.sadece_firsat} />Sadece fırsatlar</label>
           </div>
-          <div class="iki">
+          <div class="filtre-grup iki">
             <label>Giriş<input type="date" name="giris_tarihi" value={f.giris_tarihi ?? ""} /></label>
             <label>Çıkış<input type="date" name="cikis_tarihi" value={f.cikis_tarihi ?? ""} /></label>
           </div>
-          <label>Sıralama
-            <select name="siralama">
-              {[["onerilen", "Önerilen"], ["fiyat_artan", "Fiyat (artan)"], ["fiyat_azalan", "Fiyat (azalan)"], ["en_yeni", "En yeni"], ["en_firsat", "En fırsat"]]
-                .map(([k, v]) => <option value={k} selected={(f.siralama ?? "onerilen") === k}>{v}</option>)}
-            </select>
-          </label>
-          <button class="dugme tam">Uygula</button>
-          <a href="/ara" class="temizle">Temizle</a>
+          <input type="hidden" name="siralama" value={f.siralama ?? ""} data-siralama-gizli />
+          <div class="panel-alt">
+            <button class="dugme tam">Uygula</button>
+            <a href="/ara" class="temizle">Filtreleri temizle</a>
+          </div>
         </form>
 
-        <section class="sonuclar">
-          <div class="sonuc-bas"><strong>{sonuclar.length} ilan</strong></div>
+        <section class="ara-orta">
+          <div class="kum-kutu">
+            <AramaKutusu deger={metin} />
+            <div class="ornekler">{ORNEKLER.map((o) => <button type="button" class="ornek-cip" data-ornek={o}>{o}</button>)}</div>
+            <div class="ara-ozet" data-ozet hidden></div>
+          </div>
+          <div class="sonuc-bas">
+            <span>{sonuclar.length} ilan</span>
+            <div class="sonuc-sag">
+              <select data-siralama aria-label="Sıralama">
+                {[["onerilen", "Önerilen"], ["fiyat_artan", "Fiyat (artan)"], ["fiyat_azalan", "Fiyat (azalan)"], ["en_yeni", "En yeni"], ["en_firsat", "En fırsat"]]
+                  .map(([k, v]) => <option value={k} selected={(f.siralama ?? "onerilen") === k}>{v}</option>)}
+              </select>
+              <button type="button" class="filtre-ac" data-filtre-ac><Ayar boyut={16} /> Filtreler</button>
+            </div>
+          </div>
+          <div class="harita-kart mobil-harita"><div class="harita" data-harita></div></div>
           {sonuclar.length === 0 && (
             <div class="bos">
               <p>Bu kriterlere uyan ilan yok.</p>
@@ -188,12 +185,16 @@ site.get("/ara", async (c) => {
               <a href="/sihirbaz" class="dugme ikincil">Sihirbazla yeniden dene</a>
             </div>
           )}
-          <div id="harita" class="harita" data-noktalar={JSON.stringify(sonuclar.filter((i) => i.lat).map((i) => ({
-            lat: i.lat, lng: i.lng, no: i.ilan_no, baslik: i.baslik, fiyat: fiyatMetni(i),
-          })))}></div>
-          <div class="kartlar">{sonuclar.map((i) => <IlanKarti i={i} />)}</div>
+          <div class="kartlar iki-sutun">{sonuclar.map((i) => <IlanKarti i={i} />)}</div>
         </section>
+
+        <aside class="ara-harita">
+          <div class="harita-kart"><div class="harita" data-harita></div></div>
+        </aside>
       </div>
+      <script id="noktalar" type="application/json">{json(sonuclar.filter((i) => i.lat).map((i) => ({
+        lat: i.lat, lng: i.lng, no: i.ilan_no, baslik: i.baslik, fiyat: fiyatMetni(i),
+      })))}</script>
       <script id="filtreler" type="application/json">{json(f)}</script>
     </Sayfa>,
   );
@@ -203,111 +204,115 @@ site.get("/ara", async (c) => {
 site.get("/ilan/:no{[0-9]+}", async (c) => {
   const no = Number(c.req.param("no"));
   const [i] = await sql`
-    select i.*, m.ad as mahalle, m.slug as mahalle_slug, coalesce(i.lat, m.lat) as harita_lat, coalesce(i.lng, m.lng) as harita_lng
+    select i.*, m.ad as mahalle, m.slug as mahalle_slug, m.ilce, coalesce(i.lat, m.lat) as harita_lat, coalesce(i.lng, m.lng) as harita_lng
     from ilanlar i left join mahalleler m on m.id = i.mahalle_id
     where i.ilan_no = ${no} and i.durum = 'yayinda'`;
   if (!i) return c.notFound();
-  const fotolar = await sql<{ url: string; oda_etiketi: string | null }[]>`
+  let fotolar = await sql<{ url: string; oda_etiketi: string | null }[]>`
     select url, oda_etiketi from ilan_fotolari where ilan_id = ${i.id} order by sira`;
-  const benzer = (await ilanAra({ tip: i.tip, mahalleler: i.mahalle_slug ? [i.mahalle_slug] : undefined }, { limit: 4 }) as IlanKart[])
-    .filter((x) => x.id !== i.id).slice(0, 3);
-  const odalar = [...new Set(fotolar.map((f) => f.oda_etiketi).filter(Boolean))] as string[];
+  if (!fotolar.length && i.demo) fotolar = [0, 1, 2, 3].map((k) => ({ url: ornekGorsel(no + k - 1), oda_etiketi: null })) as any;
+  const benzer = (await ilanAra({ tip: i.tip }, { limit: 4 }) as IlanKart[]).filter((x) => x.id !== i.id).slice(0, 3);
   const gonderildi = c.req.query("talep") === "ok";
+  const evetHayir = (x: boolean | null) => (x == null ? "—" : x ? "Evet" : "Hayır");
 
-  const ozellikler: [string, string | null][] = [
-    ["Tip", TIP_ETIKET[i.tip]], ["Tür", TUR_ETIKET[i.emlak_turu]], ["Oda", i.oda],
-    ["Net m²", i.net_m2 ? `${i.net_m2} m²` : null], ["Brüt m²", i.brut_m2 ? `${i.brut_m2} m²` : null],
-    ["Banyo", i.banyo], ["Kapasite", i.yatak_kapasitesi ? `${i.yatak_kapasitesi} kişi` : null],
-    ["Kat", i.kat], ["Bina yaşı", i.bina_yasi], ["Havuz", { ozel: "Özel", ortak: "Ortak", yok: "Yok" }[i.havuz as string] ?? null],
-    ["Deniz manzarası", i.deniz_manzarasi ? "Var" : "Yok"], ["Denize mesafe", i.denize_mesafe_m ? `${i.denize_mesafe_m} m` : null],
-    ["Site içi", i.site_ici ? "Evet" : "Hayır"], ["Eşyalı", i.esyali ? "Evet" : "Hayır"],
-    ["Evcil hayvan", i.evcil_hayvan == null ? null : i.evcil_hayvan ? "Kabul" : "Kabul edilmiyor"],
-    ["Minimum gece", i.min_gece], ["Sezon", i.sezon_baslangic ? `${new Date(i.sezon_baslangic).toLocaleDateString("tr-TR")} – ${new Date(i.sezon_bitis).toLocaleDateString("tr-TR")}` : null],
+  const ozellikler: [string, unknown][] = [
+    ["Emlak türü", TUR_ETIKET[i.emlak_turu]], ["Oda", i.oda], ["Net m²", i.net_m2],
+    ["Brüt m²", i.brut_m2], ["Banyo", i.banyo], ["Bina yaşı", i.bina_yasi],
+    ["Kapasite", i.yatak_kapasitesi ? `${i.yatak_kapasitesi} kişi` : null], ["Kat", i.kat], ["Minimum gece", i.min_gece],
+    ["Site içi", evetHayir(i.site_ici)], ["Havuz", { ozel: "Özel", ortak: "Ortak", yok: "Yok" }[i.havuz as string]],
+    ["Deniz manzarası", evetHayir(i.deniz_manzarasi)], ["Denize mesafe", i.denize_mesafe_m ? `${i.denize_mesafe_m} m` : null],
+    ["Eşyalı", evetHayir(i.esyali)], ["Otopark", evetHayir(i.otopark)], ["Evcil hayvan", evetHayir(i.evcil_hayvan)],
+    ["Sezon", i.sezon_baslangic ? `${new Date(i.sezon_baslangic).toLocaleDateString("tr-TR")} – ${new Date(i.sezon_bitis).toLocaleDateString("tr-TR")}` : null],
   ];
 
   return c.html(
-    <Sayfa baslik={i.baslik} aciklama={i.aciklama.slice(0, 155)} harita scriptler={["/js/ilan.js"]}>
+    <Sayfa baslik={i.baslik} aciklama={i.aciklama.slice(0, 155)} harita scriptler={["/js/ilan.js", "/js/form.js"]}>
       <div class="kap ilan">
-        <div class="ilan-ust">
-          <div>
-            <div class="kart-yer"><a href={`/mahalle/${i.mahalle_slug}`}>{i.mahalle}</a> · {TIP_ETIKET[i.tip]}</div>
-            <h1>{i.baslik}</h1>
-            {i.demo && <span class="rozet demo satir">DEMO — örnek ilan</span>}
-          </div>
+        <div class="rozet-satir">
+          <span class="rozet rozet-tip">{TIP_ETIKET[i.tip]}</span>
+          {i.demo && <span class="rozet rozet-demo-acik">DEMO</span>}
+          {i.iskonto >= 0.15 && <span class="rozet rozet-firsat">Bölge ortalamasının %{Math.round(i.iskonto * 100)} altında</span>}
+          <span class="ilan-no">#{i.ilan_no}</span>
         </div>
-
-        <div class="galeri" data-galeri>
-          {odalar.length > 1 && (
-            <div class="galeri-sekme">
-              <button class="aktif" data-oda="">Tümü</button>
-              {odalar.map((o) => <button data-oda={o}>{ODA_ETIKET[o] ?? o}</button>)}
-            </div>
-          )}
-          {fotolar.length ? (
-            <div class="galeri-izgara">
-              {fotolar.map((f) => <a href={f.url} target="_blank" data-oda-etiket={f.oda_etiketi ?? ""}><img src={f.url} alt={ODA_ETIKET[f.oda_etiketi ?? ""] ?? i.baslik} loading="lazy" /></a>)}
-            </div>
-          ) : <div class="galeri-bos">{TUR_ETIKET[i.emlak_turu]} · fotoğraflar yakında</div>}
-        </div>
+        <h1>{i.baslik}</h1>
+        <a href={`/mahalle/${i.mahalle_slug}`} class="ilan-yer"><Konum boyut={16} />{i.mahalle}, {i.ilce}</a>
 
         <div class="ilan-govde">
-          <div>
-            <h2>Açıklama</h2>
+          <div class="ilan-sol">
+            <div class="galeri" data-galeri>
+              <div class="galeri-ana"><img src={fotolar[0]?.url ?? ""} alt={i.baslik} data-ana /></div>
+              {fotolar.length > 1 && (
+                <div class="galeri-kucuk">
+                  {fotolar.map((f, k) => (
+                    <button type="button" class={k === 0 ? "aktif" : ""} data-foto={f.url} title={ODA_ETIKET[f.oda_etiketi ?? ""] ?? ""}>
+                      <img src={f.url} alt="" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <p class="aciklama">{i.aciklama}</p>
+
             <h2>Özellikler</h2>
-            <dl class="ozellikler">
-              {ozellikler.filter(([, v]) => v != null && v !== "").map(([k, v]) => <><dt>{k}</dt><dd>{v}</dd></>)}
+            <dl class="ozellik-kart">
+              {ozellikler.filter(([, v]) => v != null && v !== "").map(([k, v]) => <div><dt>{k}</dt><dd>{String(v)}</dd></div>)}
             </dl>
+
             <h2>Konum</h2>
-            <div id="harita" class="harita kucuk" data-noktalar={JSON.stringify(i.harita_lat ? [{ lat: i.harita_lat, lng: i.harita_lng, baslik: i.mahalle }] : [])}></div>
+            <div class="harita-kart"><div class="harita ilan-harita" data-harita></div></div>
             <p class="kucuk">Harita mahalle merkezini gösterir; tam adres görüşmede paylaşılır.</p>
           </div>
 
-          <aside class="fiyat-kutu">
-            <div class="buyuk-fiyat">{fiyatMetni(i as any)}</div>
-            {i.sezon_fiyatlari && (
-              <ul class="sezon-fiyat">
-                <li>Yüksek sezon (Tem–Ağu): {para(i.sezon_fiyatlari.yuksek, i.para_birimi)} / gece</li>
-                <li>Ara sezon (May–Haz, Eyl–Eki): {para(i.sezon_fiyatlari.omuz, i.para_birimi)} / gece</li>
-                <li>Düşük sezon: {para(i.sezon_fiyatlari.dusuk, i.para_birimi)} / gece</li>
-              </ul>
-            )}
-            {i.tip === "satilik" && i.net_m2 && <div class="kucuk">{para(Math.round(i.fiyat / i.net_m2), i.para_birimi)} / m²</div>}
-            {i.bolge_medyani && <div class="bilgi">Bu mahallede benzer ilanların ortanca birim fiyatı: {para(i.bolge_medyani)}{i.tip === "kiralik" ? " / m² / ay" : " / m²"}{i.iskonto ? ` — bu ilan ${yuzde(i.iskonto)} altında` : ""}</div>}
-            {i.komisyon_orani && ["satilik", "kiralik"].includes(i.tip) && (
-              <div class="bilgi">Hizmet bedeli: %{(i.komisyon_orani * 100).toFixed(0)} + KDV (alıcıdan). Gösterilen fiyat ev sahibinin fiyatıdır.</div>
-            )}
-            {i.eids_no && <div class="dogrulama">✓ EİDS doğrulanmış ilan · {i.eids_no}</div>}
-            {i.turizm_izin_no && <div class="dogrulama">✓ Turizm izin belge no: {i.turizm_izin_no}</div>}
+          <aside class="ilan-sag">
+            <div class="kart-kutu fiyat-kutu">
+              <div class="buyuk-fiyat">{fiyatMetni(i as any)}</div>
+              {i.tip === "satilik" && i.net_m2 && <div class="m2-fiyat">{para(Math.round(i.fiyat / i.net_m2), i.para_birimi)} / m²</div>}
+              {i.sezon_fiyatlari && (
+                <ul class="sezon-fiyat">
+                  <li><span>Yüksek sezon (Tem–Ağu)</span><strong>{para(i.sezon_fiyatlari.yuksek, i.para_birimi)}</strong></li>
+                  <li><span>Ara sezon</span><strong>{para(i.sezon_fiyatlari.omuz, i.para_birimi)}</strong></li>
+                  <li><span>Düşük sezon</span><strong>{para(i.sezon_fiyatlari.dusuk, i.para_birimi)}</strong></li>
+                </ul>
+              )}
+              {i.komisyon_orani && ["satilik", "kiralik"].includes(i.tip) && (
+                <div class="kum-not">Hizmet bedeli: %{(i.komisyon_orani * 100).toFixed(0)} + KDV (alıcıdan). Gösterilen fiyat ev sahibinin fiyatıdır.</div>
+              )}
+              {i.bolge_medyani && <p class="kucuk">Bu mahallede benzer ilanların ortanca birim fiyatı: {para(i.bolge_medyani)}{i.tip === "kiralik" ? " / m² / ay" : " / m²"}{i.iskonto ? ` — bu ilan ${yuzde(i.iskonto)} altında` : ""}</p>}
+              {i.eids_no && <div class="dogrulama"><Onay boyut={15} /> EİDS doğrulanmış ilan · {i.eids_no}</div>}
+              {i.turizm_izin_no && <div class="dogrulama"><Onay boyut={15} /> Turizm izin belge no: {i.turizm_izin_no}</div>}
+            </div>
 
-            <h3>Bu ilanla ilgileniyorum</h3>
-            {gonderildi ? <div class="basari">Teşekkürler! Ekibimiz en kısa sürede size dönecek.</div> : (
-              <form method="post" action={`/ilan/${i.ilan_no}/talep`} class="form">
-                <input name="ad_soyad" placeholder="Ad soyad" required />
-                <input name="telefon" placeholder="Telefon" type="tel" />
-                <input name="eposta" placeholder="E-posta" type="email" />
-                {["gunluk", "sezonluk"].includes(i.tip) && (
-                  <div class="iki">
-                    <label>Giriş<input type="date" name="giris_tarihi" /></label>
-                    <label>Çıkış<input type="date" name="cikis_tarihi" /></label>
-                  </div>
-                )}
-                {["gunluk", "sezonluk"].includes(i.tip) && <input name="kisi_sayisi" type="number" min="1" placeholder="Kişi sayısı" />}
-                <textarea name="mesaj" placeholder="Mesajınız (isteğe bağlı)" rows={3}></textarea>
-                <label class="kutu"><input type="checkbox" name="kvkk_onay" value="1" required /> <span><a href="/yasal/kvkk" target="_blank">KVKK aydınlatma metnini</a> okudum, kabul ediyorum.</span></label>
-                <button class="dugme tam">Gönder</button>
-              </form>
-            )}
+            <div class="kart-kutu">
+              <h3>Bu ilanla ilgileniyorum</h3>
+              {gonderildi ? <div class="basari">Teşekkürler! Ekibimiz en kısa sürede size dönecek.</div> : (
+                <form method="post" action={`/ilan/${i.ilan_no}/talep`} class="form" data-kvkk-form>
+                  <input name="ad_soyad" placeholder="Ad soyad" required />
+                  <input name="telefon" placeholder="Telefon" type="tel" />
+                  <input name="eposta" placeholder="E-posta" type="email" />
+                  {["gunluk", "sezonluk"].includes(i.tip) && (
+                    <div class="iki">
+                      <label>Giriş<input type="date" name="giris_tarihi" /></label>
+                      <label>Çıkış<input type="date" name="cikis_tarihi" /></label>
+                    </div>
+                  )}
+                  {["gunluk", "sezonluk"].includes(i.tip) && <input name="kisi_sayisi" type="number" min="1" placeholder="Kişi sayısı" />}
+                  <textarea name="mesaj" placeholder="Mesaj" rows={3}></textarea>
+                  <label class="kutu"><input type="checkbox" name="kvkk_onay" value="1" required /><span><a href="/yasal/kvkk" target="_blank">KVKK aydınlatma metnini okudum, kabul ediyorum</a> *</span></label>
+                  <button class="dugme tam">Gönder</button>
+                </form>
+              )}
+            </div>
           </aside>
         </div>
 
         {benzer.length > 0 && (
-          <section class="bolum">
+          <section class="bolum-ust">
             <h2>Benzer ilanlar</h2>
-            <div class="kartlar">{benzer.map((b) => <IlanKarti i={b} />)}</div>
+            <div class="kartlar uc-sutun">{benzer.map((b) => <IlanKarti i={b} />)}</div>
           </section>
         )}
       </div>
+      <script id="noktalar" type="application/json">{json(i.harita_lat ? [{ lat: i.harita_lat, lng: i.harita_lng }] : [])}</script>
     </Sayfa>,
   );
 });
@@ -326,18 +331,20 @@ site.post("/ilan/:no{[0-9]+}/talep", async (c) => {
   return c.redirect(`/ilan/${no}?talep=ok`);
 });
 
+
 // ---------- Mahalle ----------
 site.get("/mahalle/:slug", async (c) => {
   const [m] = await sql<Mahalle[]>`select * from mahalleler where slug = ${c.req.param("slug")}`;
   if (!m) return c.notFound();
   const ilanlar = await ilanAra({ mahalleler: [m.slug] }) as IlanKart[];
   return c.html(
-    <Sayfa baslik={`${m.ad} — ${m.ilce}`}>
+    <Sayfa baslik={`${m.ad}, ${m.ilce}`}>
       <div class="kap bolum">
+        <span class="ust-etiket">{m.kiyi ? "Kıyı mahallesi" : "İç kesim"}</span>
         <h1>{m.ad}, {m.ilce}</h1>
-        <p class="kucuk">{m.kiyi ? "Kıyı mahallesi" : "İç kesim"} · segment: {m.segment}</p>
-        <div class="kartlar">{ilanlar.map((i) => <IlanKarti i={i} />)}</div>
-        {ilanlar.length === 0 && <p>Bu mahallede şu an yayında ilan yok.</p>}
+        <p class="alt-baslik">{ilanlar.length} yayında ilan</p>
+        <div class="kartlar uc-sutun">{ilanlar.map((i) => <IlanKarti i={i} />)}</div>
+        {ilanlar.length === 0 && <div class="bos"><p>Bu mahallede şu an yayında ilan yok.</p><a href="/ara" class="dugme ikincil">Tüm ilanlar</a></div>}
       </div>
     </Sayfa>,
   );
@@ -348,36 +355,39 @@ site.get("/evimi-listele", async (c) => {
   const mh = await mahalleler();
   const ok = c.req.query("ok") === "1";
   return c.html(
-    <Sayfa baslik="Evimi listele">
-      <div class="kap dar bolum">
-        <h1>Evinizi ücretsiz listeleyelim</h1>
-        <p>Evinizi dört dilde yayınlayıp yerli ve yabancı alıcıya ulaştıralım; size bölge fiyat analizi de gönderelim.
-          Formu doldurun, ekibimiz sizi arasın.</p>
-        {ok ? <div class="basari">Başvurunuz alındı, teşekkürler! En kısa sürede sizi arayacağız.</div> : (
-          <form method="post" class="form">
-            <input name="ad_soyad" placeholder="Ad soyad" required />
-            <input name="telefon" placeholder="Telefon" type="tel" required />
-            <input name="eposta" placeholder="E-posta (isteğe bağlı)" type="email" />
-            <div class="iki">
-              <label>Ne yapmak istiyorsunuz?
-                <select name="tip" required>
-                  <option value="satilik">Satmak</option><option value="kiralik">Yıllık kiraya vermek</option>
-                  <option value="sezonluk">Sezonluk kiraya vermek</option><option value="gunluk">Günlük / tatil kirası</option>
-                </select>
-              </label>
-              <label>Mahalle
-                <select name="mahalle_id"><option value="">Seçin</option>{mh.map((m) => <option value={m.id}>{m.ad} ({m.ilce})</option>)}</select>
-              </label>
-            </div>
-            <label>Emlak türü
-              <select name="emlak_turu">{Object.entries(TUR_ETIKET).map(([k, v]) => <option value={k}>{v}</option>)}</select>
-            </label>
-            <textarea name="mesaj" rows={4} placeholder="Eviniz hakkında kısaca (oda sayısı, m², havuz, fiyat beklentiniz…)"></textarea>
-            <label class="kutu"><input type="checkbox" name="kvkk_onay" value="1" required /><span><a href="/yasal/kvkk" target="_blank">KVKK aydınlatma metnini</a> okudum, kabul ediyorum.</span></label>
-            <label class="kutu"><input type="checkbox" name="iys_onay" value="1" /><span>Kampanya ve bilgilendirme iletileri almak istiyorum (isteğe bağlı).</span></label>
-            <button class="dugme tam">Başvur</button>
-          </form>
-        )}
+    <Sayfa baslik="Evinizi listeleyin" scriptler={["/js/form.js"]}>
+      <div class="liste-sayfa">
+        <div class="kap orta-dar">
+          <h1>Evinizi listeleyin</h1>
+          <p class="alt-baslik">Bilgilerinizi bırakın; ekibimiz sizi arayıp süreci anlatsın. Listeleme ücretsizdir.</p>
+          {ok ? <div class="kart-kutu"><div class="basari">Başvurunuz alındı, teşekkürler! En kısa sürede sizi arayacağız.</div></div> : (
+            <form method="post" class="kart-kutu form" data-kvkk-form>
+              <div class="iki">
+                <label>Ad soyad *<input name="ad_soyad" required /></label>
+                <label>Telefon *<input name="telefon" type="tel" required /></label>
+              </div>
+              <label>E-posta<input name="eposta" type="email" /></label>
+              <div class="uc">
+                <label>Tip
+                  <select name="tip" required>
+                    <option value="satilik">Satılık</option><option value="kiralik">Kiralık</option>
+                    <option value="sezonluk">Sezonluk</option><option value="gunluk">Günlük</option>
+                  </select>
+                </label>
+                <label>Mahalle
+                  <select name="mahalle_id"><option value="">—</option>{mh.map((m) => <option value={m.id}>{m.ad}</option>)}</select>
+                </label>
+                <label>Emlak türü
+                  <select name="emlak_turu">{Object.entries(TUR_ETIKET).map(([k, v]) => <option value={k}>{v}</option>)}</select>
+                </label>
+              </div>
+              <label>Mesaj<textarea name="mesaj" rows={3}></textarea></label>
+              <label class="kutu"><input type="checkbox" name="kvkk_onay" value="1" required /><span><a href="/yasal/kvkk" target="_blank">KVKK aydınlatma metnini okudum, kabul ediyorum</a> *</span></label>
+              <label class="kutu"><input type="checkbox" name="iys_onay" value="1" /><span>Kampanya ve bilgilendirme iletileri almak istiyorum</span></label>
+              <button class="dugme tam">Gönder</button>
+            </form>
+          )}
+        </div>
       </div>
     </Sayfa>,
   );

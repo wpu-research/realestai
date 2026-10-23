@@ -70,7 +70,7 @@ export function sezonBandi(tarih?: string): "yuksek" | "omuz" | "dusuk" {
 
 export type IlanKart = {
   id: string; ilan_no: number; tip: string; emlak_turu: string; baslik: string; demo: boolean;
-  mahalle: string | null; mahalle_slug: string | null; lat: number | null; lng: number | null;
+  mahalle: string | null; mahalle_slug: string | null; ilce: string | null; lat: number | null; lng: number | null;
   net_m2: number | null; oda: string | null; yatak_kapasitesi: number | null;
   havuz: string; deniz_manzarasi: boolean; denize_mesafe_m: number | null;
   fiyat: number; para_birimi: string; fiyat_birimi: string; donem_fiyati: number;
@@ -97,7 +97,7 @@ export async function ilanAra(f: Filtreler, opt: { limit?: number; sayim?: boole
     ${f.oda?.length ? sql`and (i.oda in ${sql(f.oda)} ${yuksekOda ? sql`or ${odaSayisi} >= 4` : sql``})` : sql``}
     ${f.min_net_m2 ? sql`and i.net_m2 >= ${f.min_net_m2}` : sql``}
     ${f.min_kapasite ? sql`and i.yatak_kapasitesi >= ${f.min_kapasite}` : sql``}
-    ${f.havuz === "ozel" ? sql`and i.havuz = 'ozel'` : f.havuz ? sql`and i.havuz <> 'yok'` : sql``}
+    ${f.havuz === "ozel" || f.havuz === "ortak" ? sql`and i.havuz = ${f.havuz}` : f.havuz ? sql`and i.havuz <> 'yok'` : sql``}
     ${f.deniz_manzarasi ? sql`and i.deniz_manzarasi` : sql``}
     ${f.max_denize_mesafe_m ? sql`and i.denize_mesafe_m <= ${f.max_denize_mesafe_m}` : sql``}
     ${f.site_ici ? sql`and i.site_ici` : sql``}
@@ -121,7 +121,7 @@ export async function ilanAra(f: Filtreler, opt: { limit?: number; sayim?: boole
 
   return sql<IlanKart[]>`
     select i.id, i.ilan_no, i.tip, i.emlak_turu, i.baslik, i.demo,
-           m.ad as mahalle, m.slug as mahalle_slug,
+           m.ad as mahalle, m.slug as mahalle_slug, m.ilce,
            coalesce(i.lat, m.lat) as lat, coalesce(i.lng, m.lng) as lng,
            i.net_m2, i.oda, i.yatak_kapasitesi, i.havuz, i.deniz_manzarasi, i.denize_mesafe_m,
            i.fiyat, i.para_birimi, i.fiyat_birimi,
