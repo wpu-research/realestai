@@ -488,3 +488,35 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
 .alt-ic { grid-template-columns: 1.4fr 1fr 1fr 1fr; }
 @media (max-width: 1023px) { .alt-ic { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 767px) { .alt-ic { grid-template-columns: 1fr; } }
+
+/* ---------- Ekran görüntülerindeki düzen (Lovable) ---------- */
+.ust-ic { gap: 40px; }
+.ust-nav { flex: 1; }
+.ust-sag { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.ust-secim { width: auto; min-height: 36px; padding: 6px 10px; font-size: .9rem; border-radius: 8px; background: var(--card); cursor: pointer; }
+.kayit-link { margin: 0 6px 0 0; position: relative; }
+.kayit-link .rozet-sayi { position: absolute; top: -8px; right: -10px; }
+.alt-ic { grid-template-columns: repeat(3, 1fr); }
+.alt-araclar { font-size: .82rem; line-height: 1.8; margin-top: 14px !important; }
+.alt-araclar a { color: var(--muted-foreground); text-decoration: none; }
+.alt-araclar a:hover { color: var(--primary); }
+.cerez-bandi { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 900; width: min(672px, calc(100% - 24px));
+  display: flex; align-items: center; gap: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.12); font-size: .92rem; }
+.cerez-bandi p { margin: 0; flex: 1; }
+.cerez-bandi a { color: var(--foreground); }
+.cerez-bandi .dugme { padding: 8px 14px; font-size: .85rem; flex: none; }
+/* Kartlarda kalp yalnız üzerine gelince (kayıtlıysa her zaman); dokunmatikte her zaman */
+@media (hover: hover) {
+  .kart .kalp { opacity: 0; transition: opacity .15s; }
+  .kart:hover .kalp, .kart .kalp.kayitli, .kart .kalp:focus-visible { opacity: 1; }
+}
+@media (max-width: 1023px) { .alt-ic { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 767px) {
+  .alt-ic { grid-template-columns: 1fr; }
+  .ust-sag .ust-secim { padding: 6px; font-size: .85rem; }
+  .cerez-bandi { flex-direction: column; align-items: stretch; gap: 10px; }
+}
+.galeri-ana { position: relative; }
+.temsili-etiket { position: absolute; right: 12px; bottom: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: .72rem; padding: 3px 9px; border-radius: 6px; }
+.mahalle-karo::after { content: "temsili"; position: absolute; top: 8px; right: 10px; font-size: .62rem; color: rgba(255,255,255,.75); letter-spacing: .04em; }

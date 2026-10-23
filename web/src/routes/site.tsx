@@ -3,7 +3,7 @@ import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
 import { Ara, Ayar, Konum, Mikrofon, Ok, Onay } from "../views/ikon.js";
-import { IlanKarti, json, ornekGorsel, Sayfa } from "../views/layout.js";
+import { demoGorselleri, Fiyat, IlanKarti, json, mahalleGorseli, ornekGorsel, Sayfa } from "../views/layout.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 
 const etiket = (liste: { k: string; e: string }[], k: string | null) => (k ? liste.find((x) => x.k === k)?.e ?? k : null);
@@ -21,11 +21,12 @@ const ORNEKLER = [
 ];
 
 function AramaKutusu({ deger = "", hero = false }: { deger?: string; hero?: boolean }) {
+  // Kısa yazım kelimeyle arar; cümle yazılırsa ya da mikrofon kullanılırsa "detaylı arama" (yapay zekâ) devreye girer.
   return (
-    <form class={`arama-kutu ${hero ? "hero-arama" : ""}`} data-sesli-arama action="/ara" method="get">
+    <form class={`arama-kutu ${hero ? "hero-arama" : ""}`} data-sesli-arama data-akilli action="/ara" method="get">
       <span class="arama-ikon"><Ara boyut={hero ? 20 : 18} /></span>
-      <input name="kelime" value={deger} placeholder="Mahalle, site adı ya da özellik yazın…" autocomplete="off" />
-      <button type="button" class="sesli-arama-dugme" data-mikrofon hidden><Mikrofon boyut={hero ? 20 : 18} /><span>Detaylı sesli arama</span></button>
+      <input name="kelime" value={deger} placeholder="Örn. Bitez'de denize yakın havuzlu 2+1 satılık" autocomplete="off" />
+      <button type="button" class="mikrofon" data-mikrofon aria-label="Detaylı sesli arama" title="Detaylı sesli arama" hidden><Mikrofon boyut={hero ? 20 : 18} /></button>
       <button type="submit" class="ara-dugme">Ara</button>
       <div class="arama-durum" data-durum></div>
     </form>
@@ -54,13 +55,6 @@ site.get("/", async (c) => {
               <a href={`/ara?tip=${t}`} class="cam-cip">{TIP_ETIKET[t]}</a>
             ))}
           </div>
-          <div class="hero-ornekler">
-            <span>Detaylı arama örneği:</span>
-            {ORNEKLER.slice(0, 2).map((o) => <button type="button" class="ornek-cam" data-ornek={o}>"{o}"</button>)}
-          </div>
-          <div class="hero-alt-link">
-            <a href="/sihirbaz">Adım adım arayalım</a><span>·</span><a href="/asistan">Didem'le konuşarak ara</a>
-          </div>
         </div>
       </section>
 
@@ -72,44 +66,13 @@ site.get("/", async (c) => {
         <div class="kartlar uc-sutun">{firsatlar.map((i) => <IlanKarti i={i} />)}</div>
       </section>
 
-      <section class="kap bolum arac-bolum">
-        <h2>Alırken, satarken, kiralarken</h2>
-        <div class="arac-izgara">
-          <a href="/rehber/alirken" class="arac-kart">
-            <span class="arac-ust">Alırken</span>
-            <strong>Gayrimenkul ekspertizi ve alım rehberi</strong>
-            <p>Ev satın alırken ekspertiz, tapu ve masraflarla ilgili ihtiyacınız olan bilgilere kolayca ulaşın.</p>
-          </a>
-          <a href="/rehber/satarken" class="arac-kart">
-            <span class="arac-ust">Satarken</span>
-            <strong>Emlak alım/satım rehberi</strong>
-            <p>Evinizi satarken ihtiyacınız olacak belgeleri, adımları ve masrafları hızlıca öğrenin.</p>
-          </a>
-          <a href="/rehber/kiralarken" class="arac-kart">
-            <span class="arac-ust">Kiralarken</span>
-            <strong>Emlak endeksi</strong>
-            <p>Bölgedeki evlerin fiyat ortalamalarını ve değişimlerini mahalle mahalle görün.</p>
-          </a>
-          <a href="/kredi" class="arac-kart">
-            <span class="arac-ust">Kredi</span>
-            <strong>Konut kredisi hesapla</strong>
-            <p>Ev alırken kredi tutarına, vadeye ve faize göre aylık taksidinizi hemen hesaplayın.</p>
-          </a>
-        </div>
-        <div class="arac-serit">
-          <a href="/endeks">📈 Emlak endeksi</a>
-          <a href="/kredi">🧮 Kredi hesapla</a>
-          <a href="/emlakci-bul">🤝 Bana emlakçı bul</a>
-        </div>
-      </section>
-
       <section class="kum-bolum">
         <div class="kap bolum">
           <h2>Mahalleler</h2>
           <div class="mahalle-izgara">
             {mh.map((m, k) => (
               <a href={`/mahalle/${m.slug}`} class="mahalle-karo">
-                <img src={ornekGorsel(k)} alt="" loading="lazy" />
+                <img src={mahalleGorseli(m.slug, k)} alt={`${m.ad} (temsili görsel)`} loading="lazy" />
                 <div class="mahalle-perde"></div>
                 <div class="mahalle-yazi"><strong>{m.ad}</strong><span>{m.ilce} · {m.n}</span></div>
               </a>
@@ -141,7 +104,10 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
   if (!i) return c.notFound();
   let fotolar = await sql<{ url: string; oda_etiketi: string | null }[]>`
     select url, oda_etiketi from ilan_fotolari where ilan_id = ${i.id} order by sira`;
-  if (!fotolar.length && i.demo) fotolar = [0, 1, 2, 3].map((k) => ({ url: ornekGorsel(no + k - 1), oda_etiketi: null })) as any;
+  if (!fotolar.length && i.demo) {
+    const uretilmis = demoGorselleri(no);
+    fotolar = (uretilmis.length ? uretilmis : [0, 1, 2, 3].map((k) => ornekGorsel(no + k - 1))).map((url) => ({ url, oda_etiketi: null })) as any;
+  }
   const benzer = (await ilanAra({ tip: i.tip }, { limit: 4 }) as IlanKart[]).filter((x) => x.id !== i.id).slice(0, 3);
   const gonderildi = c.req.query("talep") === "ok";
   const evetHayir = (x: boolean | null) => (x == null ? "—" : x ? "Evet" : "Hayır");
@@ -184,7 +150,7 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
         <div class="ilan-govde">
           <div class="ilan-sol">
             <div class="galeri" data-galeri>
-              <div class="galeri-ana"><img src={fotolar[0]?.url ?? ""} alt={i.baslik} data-ana /></div>
+              <div class="galeri-ana"><img src={fotolar[0]?.url ?? ""} alt={i.baslik} data-ana />{i.demo && <span class="temsili-etiket">Temsili görsel</span>}</div>
               {fotolar.length > 1 && (
                 <div class="galeri-kucuk">
                   {fotolar.map((f, k) => (
@@ -217,8 +183,8 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
 
           <aside class="ilan-sag">
             <div class="kart-kutu fiyat-kutu">
-              <div class="buyuk-fiyat">{fiyatMetni(i as any)}</div>
-              {i.tip === "satilik" && i.net_m2 && <div class="m2-fiyat">{para(Math.round(i.fiyat / i.net_m2), i.para_birimi)} / m²</div>}
+              <div class="buyuk-fiyat"><Fiyat tutar={i.fiyat} pb={i.para_birimi} ek={({ toplam: "", aylik: " / ay", sezon: " / sezon", gecelik: " / gece" } as Record<string, string>)[i.fiyat_birimi]} /></div>
+              {i.tip === "satilik" && i.net_m2 && <div class="m2-fiyat"><Fiyat tutar={Math.round(i.fiyat / i.net_m2)} pb={i.para_birimi} ek=" / m²" /></div>}
               {i.sezon_fiyatlari && (
                 <ul class="sezon-fiyat">
                   <li><span>Yüksek sezon (Tem–Ağu)</span><strong>{para(i.sezon_fiyatlari.yuksek, i.para_birimi)}</strong></li>
@@ -362,7 +328,7 @@ site.post("/evimi-listele", async (c) => {
 site.get("/sihirbaz", async (c) => {
   const mh = await mahalleler();
   return c.html(
-    <Sayfa baslik="Size uygun evi bulalım" harita scriptler={["/js/sihirbaz.js"]} asistanDugmesi={false}>
+    <Sayfa baslik="Size uygun evi bulalım" harita scriptler={["/js/sihirbaz.js"]}>
       <div class="sihirbaz-kap">
         <div class="sihirbaz" data-sihirbaz>
           <div class="sihirbaz-ilerleme"><div data-ilerleme></div></div>
@@ -383,7 +349,7 @@ site.get("/sihirbaz", async (c) => {
 
 site.get("/asistan", (c) =>
   c.html(
-    <Sayfa baslik="Didem'le konuşarak ara" scriptler={["/js/asistan.js"]} asistanDugmesi={false}>
+    <Sayfa baslik="Didem'le konuşarak ara" scriptler={["/js/asistan.js"]}>
       <div class="asistan-kap" data-asistan>
         <div class="avatar-alan">
           <div class="ai-etiket">Yapay zekâ asistanı — Didem'in görünüşü ve sesiyle</div>
@@ -414,6 +380,8 @@ site.get("/asistan", (c) =>
 const YASAL: Record<string, [string, string]> = {
   kvkk: ["KVKK Aydınlatma Metni", "Veri sorumlusu: [ŞİRKET UNVANI]. Başvuru ve talep formlarında verdiğiniz ad, telefon ve e-posta bilgileri yalnız talebinizi yanıtlamak ve ilan hizmetini sunmak amacıyla işlenir; yurt içinde barındırma hizmeti sağlayıcılarına ve yazılı açık rızanızla yurt dışındaki hizmet sağlayıcılara aktarılabilir. Verileriniz amaç için gerekli süre boyunca saklanır. KVKK m.11 kapsamındaki haklarınız için [e-posta] adresine başvurabilirsiniz."],
   cerez: ["Çerez Politikası", "Bu site yalnız oturum için zorunlu çerez kullanır. Analitik veya reklam çerezi kullanılmaz."],
+  "acik-riza": ["Açık Rıza Metni", "[ŞİRKET UNVANI] tarafından, talebimi yanıtlamak ve ilan hizmetinin sunulması amacıyla, yurt dışındaki hizmet sağlayıcılara aktarım dahil kişisel verilerimin işlenmesine açık rıza veriyorum. Rızamı dilediğim zaman [e-posta] adresine yazarak geri alabilirim."],
+  iys: ["Ticari Elektronik İleti Onay Metni", "[ŞİRKET UNVANI] tarafından kampanya, yeni ilan ve bilgilendirme amaçlı ticari elektronik iletilerin (SMS, e-posta, arama) tarafıma gönderilmesine onay veriyorum. Onayımı İleti Yönetim Sistemi (İYS) üzerinden ya da [e-posta] adresine yazarak dilediğim zaman geri alabilirim."],
   kullanim: ["Kullanım Koşulları", "İlan bilgileri ev sahiplerinin beyanına dayanır. Yapay zekâ ile üretilen içerikler (çeviriler, temsili görseller, asistan yanıtları) bilgi amaçlıdır; karar vermeden önce mülkü yerinde görün ve tapu kaydını kontrol edin."],
 };
 site.get("/yasal/:sayfa", (c) => {

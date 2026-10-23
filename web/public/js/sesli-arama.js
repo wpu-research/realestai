@@ -22,10 +22,21 @@ if (kutu) {
       try { sessionStorage.setItem("aramaOzeti", j.ozet); } catch {}
       location.href = j.url;
     } catch {
+      // Yapay zekâ kullanılamıyorsa kelimeyle aramaya düş.
+      if (kutu.tagName === "FORM") { kutu.dataset.dogrudan = "1"; kutu.submit(); return; }
       durum.textContent = "Detaylı arama şu an kullanılamıyor; kelimeyle aramayı deneyin.";
     } finally {
       kutu.classList.remove("bekliyor");
     }
+  }
+
+  // Ana sayfa: 3+ kelimelik cümle detaylı aramaya gider; kısa yazım kelime aramasıdır.
+  if (kutu.hasAttribute("data-akilli")) {
+    kutu.addEventListener("submit", (e) => {
+      if (kutu.dataset.dogrudan) return;
+      const metin = girdi.value.trim();
+      if (metin.split(/\s+/).length >= 3) { e.preventDefault(); detayliAra(metin); }
+    });
   }
 
   if (KonusmaTanima) {

@@ -1,7 +1,10 @@
 import type { Child } from "hono/jsx";
 import { raw } from "hono/html";
+import { readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { SITE_ADI } from "../config.js";
-import type { IlanKart } from "../lib/arama.js";
+import { KUR, type IlanKart } from "../lib/arama.js";
 import { para, TIP_ETIKET } from "../lib/bicim.js";
 import { Alan, Kisi, Menu, Yatak } from "./ikon.js";
 
@@ -11,11 +14,11 @@ type SayfaProps = {
   children: Child;
   harita?: boolean;
   scriptler?: string[];
-  asistanDugmesi?: boolean;
-  seffafUst?: boolean;
 };
 
-export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], asistanDugmesi = true }: SayfaProps) {
+const KALP = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z";
+
+export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: SayfaProps) {
   return (
     <html lang="tr">
       <head>
@@ -35,16 +38,24 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], asis
             <a href="/" class="logo">{SITE_ADI}</a>
             <nav class="ust-nav" data-menu>
               <a href="/ara">İlanlar</a>
-              <a href="/endeks">Emlak endeksi</a>
-              <a href="/kredi">Kredi hesapla</a>
-              <a href="/emlakci-bul">Bana emlakçı bul</a>
               <a href="/evimi-listele">Evinizi listeleyin</a>
             </nav>
-            <a href="/kaydedilenler" class="kayit-link" aria-label="Kaydedilenler">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
-              <span class="kayit-yazi">Kaydedilenler</span><span class="rozet-sayi" data-kayit-sayi hidden></span>
-            </a>
-            <button type="button" class="menu-dugme" aria-label="Menü" onclick="document.querySelector('[data-menu]').classList.toggle('acik')"><Menu boyut={22} /></button>
+            <div class="ust-sag">
+              <a href="/kaydedilenler" class="kayit-link" aria-label="Kaydedilenler" title="Kaydedilenler">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d={KALP} /></svg>
+                <span class="rozet-sayi" data-kayit-sayi hidden></span>
+              </a>
+              <select class="ust-secim" aria-label="Dil" data-dil>
+                <option value="tr" selected>TR</option>
+                <option value="en" disabled title="Yakında">EN</option>
+                <option value="ru" disabled title="Yakında">RU</option>
+                <option value="de" disabled title="Yakında">DE</option>
+              </select>
+              <select class="ust-secim" aria-label="Para birimi" data-para-birimi>
+                {["TRY", "EUR", "USD", "GBP"].map((p) => <option value={p}>{p}</option>)}
+              </select>
+              <button type="button" class="menu-dugme" aria-label="Menü" onclick="document.querySelector('[data-menu]').classList.toggle('acik')"><Menu boyut={22} /></button>
+            </div>
           </div>
         </header>
         <main>{children}</main>
@@ -54,48 +65,65 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], asis
               <a href="/" class="logo">{SITE_ADI}</a>
               <p>Bodrum · Milas · Didim</p>
               <p class="kucuk">Taşınmaz Ticareti Yetki Belgesi No: [doldurulacak]</p>
-            </div>
-            <div class="alt-sutun">
-              <strong>Rehberler</strong>
-              <a href="/rehber/alirken">Alırken</a>
-              <a href="/rehber/satarken">Satarken</a>
-              <a href="/rehber/kiralarken">Kiralarken</a>
-              <a href="/kredi">Kredi hesapla</a>
+              <p class="alt-araclar">
+                <a href="/endeks">Emlak endeksi</a> · <a href="/kredi">Kredi hesapla</a> · <a href="/emlakci-bul">Bana emlakçı bul</a> ·{" "}
+                <a href="/rehber/alirken">Alırken</a> · <a href="/rehber/satarken">Satarken</a> · <a href="/rehber/kiralarken">Kiralarken</a> ·{" "}
+                <a href="/asistan">Didem'le konuş</a>
+              </p>
             </div>
             <div class="alt-sutun">
               <strong>Yasal</strong>
               <a href="/yasal/kvkk">KVKK Aydınlatma Metni</a>
+              <a href="/yasal/acik-riza">Açık Rıza Metni</a>
               <a href="/yasal/cerez">Çerez Politikası</a>
               <a href="/yasal/kullanim">Kullanım Koşulları</a>
+              <a href="/yasal/iys">Ticari İleti Onay Metni</a>
             </div>
             <div class="alt-sutun">
               <strong>İletişim</strong>
               <span>[telefon — doldurulacak]</span>
               <span>[e-posta — doldurulacak]</span>
-              <a href="/admin">Ekip girişi</a>
+              <span>Instagram · Facebook · WhatsApp</span>
             </div>
           </div>
         </footer>
-        {asistanDugmesi && (
-          <a href="/asistan" class="asistan-balon" aria-label="Didem'le konuşarak ara">
-            <img src="/img/didem.svg" alt="" />
-            <span>Didem'le konuşarak ara</span>
-          </a>
-        )}
+        <div class="cerez-bandi" data-cerez hidden>
+          <p>Sitemiz yalnızca çalışması için zorunlu çerezleri kullanır. Ayrıntılar çerez politikamızda. <a href="/yasal/cerez">Çerez politikası</a></p>
+          <button type="button" class="dugme" data-cerez-tamam>Anladım</button>
+        </div>
+        <script id="kurlar" type="application/json">{json(KUR)}</script>
         {harita && <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>}
-        {[...new Set([...scriptler, "/js/kaydet.js"])].map((s) => <script type="module" src={s}></script>)}
+        {[...new Set([...scriptler, "/js/kaydet.js", "/js/genel.js"])].map((s) => <script type="module" src={s}></script>)}
       </body>
     </html>
   );
 }
 
-// Fotoğrafı olmayan (yalnız DEMO) ilanlar için Lovable tasarımındaki örnek görseller.
-export const ornekGorsel = (n: number) => `/img/ph-${(n % 4) + 1}.jpg`;
+// Üretilmiş temsili görseller (public/img/mahalle/<slug>.jpg, public/img/ilan/demo-<no>-<k>.jpg).
+// Açılışta bir kez taranır; olmayan için Lovable'ın 4 örnek görseline düşülür.
+const imgKok = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "public", "img");
+const dosyalar = (alt: string) => { try { return new Set(readdirSync(join(imgKok, alt))); } catch { return new Set<string>(); } };
+const MAHALLE_GORSEL = dosyalar("mahalle");
+const ILAN_GORSEL = dosyalar("ilan");
+
+export const ornekGorsel = (n: number) => `/img/ph-${(((n % 4) + 4) % 4) + 1}.jpg`;
+export const mahalleGorseli = (slug: string, k: number) =>
+  MAHALLE_GORSEL.has(`${slug}.jpg`) ? `/img/mahalle/${slug}.jpg` : ornekGorsel(k);
+// DEMO ilan için k. temsili görsel (yoksa null)
+export const demoGorseli = (no: number, k: number) =>
+  ILAN_GORSEL.has(`demo-${no}-${k}.jpg`) ? `/img/ilan/demo-${no}-${k}.jpg` : null;
+export const demoGorselleri = (no: number) =>
+  [0, 1, 2, 3].map((k) => demoGorseli(no, k)).filter((x): x is string => !!x);
 
 const BIRIM: Record<string, string> = { toplam: "", aylik: " /ay", sezon: " sezon toplamı", gecelik: " /gece" };
 
+// Fiyat: sunucu ilanın kendi para biriminde yazar; üstteki para birimi seçimine göre tarayıcı çevirir.
+export function Fiyat({ tutar, pb, ek = "", sinif }: { tutar: number; pb: string; ek?: string; sinif?: string }) {
+  return <span class={sinif} data-tutar={tutar} data-pb={pb} data-ek={ek}>{para(tutar, pb)}{ek}</span>;
+}
+
 export function IlanKarti({ i }: { i: IlanKart }) {
-  const kapak = i.kapak ?? (i.demo ? ornekGorsel(i.ilan_no) : null);
+  const kapak = i.kapak ?? (i.demo ? demoGorseli(i.ilan_no, 0) ?? ornekGorsel(i.ilan_no) : null);
   const fiyat = i.fiyat_birimi === "gecelik" ? i.donem_fiyati : i.fiyat;
   return (
     <a href={`/ilan/${i.ilan_no}`} class="kart">
@@ -104,7 +132,7 @@ export function IlanKarti({ i }: { i: IlanKart }) {
         <span class="rozet rozet-tip">{TIP_ETIKET[i.tip]}</span>
         {i.demo && <span class="rozet rozet-demo">DEMO</span>}
         <button type="button" class="kalp" data-kaydet-ilan={i.ilan_no} aria-label="Kaydet" aria-pressed="false">
-          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"><path d={KALP} /></svg>
         </button>
         {i.iskonto != null && i.iskonto >= 0.15 && (
           <span class="rozet rozet-firsat">Bölge ortalamasının %{Math.round(i.iskonto * 100)} altında</span>
@@ -118,8 +146,8 @@ export function IlanKarti({ i }: { i: IlanKart }) {
           {i.net_m2 && <span><Alan boyut={14} />{i.net_m2} m²</span>}
           {i.yatak_kapasitesi && <span><Kisi boyut={14} />{i.yatak_kapasitesi} kişi</span>}
         </div>
-        <div class="kart-fiyat">{para(fiyat, i.para_birimi)}{BIRIM[i.fiyat_birimi]}</div>
-        {i.tip === "satilik" && i.net_m2 && <div class="kart-m2">{para(Math.round(i.fiyat / i.net_m2), i.para_birimi)} / m²</div>}
+        <div class="kart-fiyat"><Fiyat tutar={fiyat} pb={i.para_birimi} ek={BIRIM[i.fiyat_birimi]} /></div>
+        {i.tip === "satilik" && i.net_m2 && <div class="kart-m2"><Fiyat tutar={Math.round(i.fiyat / i.net_m2)} pb={i.para_birimi} ek=" / m²" /></div>}
       </div>
     </a>
   );
