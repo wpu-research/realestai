@@ -7,7 +7,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ilkYonetici } from "./auth.js";
 import { getCookie, setCookie } from "hono/cookie";
-import { DILLER, dilIle, type Dil } from "./lib/dil.js";
+import { DILLER, dilIle, t, type Dil } from "./lib/dil.js";
 import { seo } from "./routes/seo.js";
 import { UPLOAD_DIZIN } from "./config.js";
 import { migrate, sql } from "./db.js";
@@ -71,15 +71,21 @@ app.route("/", site);
 
 app.notFound((c) =>
   c.html(
-    <Sayfa baslik="Bulunamadı">
-      <div class="kap dar bolum"><h1>Sayfa bulunamadı</h1><p><a href="/">Ana sayfaya dön</a></p></div>
+    <Sayfa baslik={t("Bulunamadı")} noindex>
+      <div class="kap dar bolum"><h1>{t("Sayfa bulunamadı")}</h1><p><a href="/">{t("Ana sayfaya dön")}</a></p></div>
     </Sayfa>,
     404,
   ),
 );
 app.onError((e, c) => {
   console.error(e);
-  return c.text("Bir hata oluştu, lütfen tekrar deneyin.", 500);
+  if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/eklenti-api/")) return c.json({ hata: "sunucu hatası" }, 500);
+  return c.html(
+    <Sayfa baslik={t("Bir hata oluştu")} noindex>
+      <div class="kap dar bolum"><h1>{t("Bir hata oluştu")}</h1><p>{t("Lütfen biraz sonra tekrar deneyin.")}</p><p><a href="/">{t("Ana sayfaya dön")}</a></p></div>
+    </Sayfa>,
+    500,
+  );
 });
 
 await migrate(join(kok, "db", "migrations"));
