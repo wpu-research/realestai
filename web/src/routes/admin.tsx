@@ -6,7 +6,8 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { ilanCevir } from "../ai/claude.js";
 import { fotoEtiketi, ODALAR } from "../ai/nvidia.js";
-import { cikisYap, ekipGerekli, girisYap, sifreHashle, type Ortam } from "../auth.js";
+import { cikisYap, ekipGerekli, girisYap, sifreDogru, sifreHashle, type Ortam } from "../auth.js";
+import { getCookie } from "hono/cookie";
 import { SITE_ADI, UPLOAD_DIZIN } from "../config.js";
 import { sql } from "../db.js";
 import { csvOku } from "../lib/csv.js";
@@ -16,6 +17,7 @@ import {
   AVATAR_DIZIN, avatarAyar, avatarAyarKaydet, klonSesAcik, rizaGecerli, rizayiGeriAl, SesHatasi, sesAnahtarlariVar, sesUret,
 } from "../lib/avatar.js";
 import { KAYIT_BOLUMLERI, KAYIT_KURALLARI } from "../lib/kayit-metni.js";
+import { istemciIp, pdfMi, say, sayi, sifirla } from "../lib/sinir.js";
 import { aramaRehberi, takipMesaji, waNumara } from "../lib/arama-rehberi.js";
 import { istek } from "../lib/dil.js";
 import { ESKI_GUN, gunOnce, krediOranlari, krediOranlariKaydet, oranlariAyikla, type KrediOranlari } from "../lib/kredi-oran.js";
@@ -27,13 +29,27 @@ import {
 
 export const admin = new Hono<Ortam>();
 
+// Başka bir siteden gönderilen formlar reddedilir (çerez SameSite=Lax'a ek savunma). Origin yoksa Referer'a bakılır.
+admin.use("*", async (c, next) => {
+  if (c.req.method !== "GET" && c.req.method !== "HEAD") {
+    const kaynak = c.req.header("origin") ?? c.req.header("referer");
+    let host: string | null = null;
+    try { host = kaynak ? new URL(kaynak).host : null; } catch { host = "gecersiz"; }
+    if (host && host !== c.req.header("host")) return c.text("Geçersiz istek kaynağı", 403);
+  }
+  await next();
+});
+
 // ---------- Giriş (oturum gerektirmez) ----------
+// Kaba kuvvete karşı: 15 dakikada IP başına 20, hesap başına 8 hatalı deneme.
+const GIRIS_PENCERE = 15 * 60_000;
 admin.get("/giris", (c) =>
   c.html(
     <AdminSayfa baslik="Ekip girişi" menu={false}>
       <form method="post" class="form dar giris">
         <h1>{SITE_ADI} · Ekip girişi</h1>
-        {c.req.query("hata") && <div class="hata">E-posta veya şifre hatalı.</div>}
+        {c.req.query("hata") === "1" && <div class="hata">E-posta veya şifre hatalı.</div>}
+        {c.req.query("hata") === "sinir" && <div class="hata">Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.</div>}
         <input name="eposta" type="email" placeholder="E-posta" required autofocus />
         <input name="sifre" type="password" placeholder="Şifre" required />
         <input type="hidden" name="don" value={c.req.query("don") ?? "/admin"} />
@@ -45,9 +61,18 @@ admin.get("/giris", (c) =>
 admin.post("/giris", async (c) => {
   const b = await c.req.parseBody();
   const don = typeof b.don === "string" && b.don.startsWith("/admin") ? b.don : "/admin";
-  return (await girisYap(c, String(b.eposta ?? ""), String(b.sifre ?? "")))
-    ? c.redirect(don)
-    : c.redirect(`/admin/giris?hata=1&don=${encodeURIComponent(don)}`);
+  const eposta = String(b.eposta ?? "").trim().toLowerCase();
+  const ipA = `giris-ip:${istemciIp(c.req.header.bind(c.req))}`, hesapA = `giris-hesap:${eposta}`;
+  if (sayi(ipA, GIRIS_PENCERE) >= 20 || sayi(hesapA, GIRIS_PENCERE) >= 8) {
+    return c.redirect(`/admin/giris?hata=sinir&don=${encodeURIComponent(don)}`);
+  }
+  if (await girisYap(c, eposta, String(b.sifre ?? ""))) {
+    sifirla(hesapA);
+    return c.redirect(don);
+  }
+  say(ipA, GIRIS_PENCERE);
+  say(hesapA, GIRIS_PENCERE);
+  return c.redirect(`/admin/giris?hata=1&don=${encodeURIComponent(don)}`);
 });
 
 admin.use("*", ekipGerekli);
@@ -84,7 +109,7 @@ function AdminSayfa({ baslik, children, menu = true, kullanici, scriptler = [] }
               {kullanici?.rol === "admin" && <a href="/admin/yayin">Yayına hazırlık</a>}
               {kullanici?.rol === "admin" && <a href="/admin/kullanicilar">Kullanıcılar</a>}
             </nav>
-            <form method="post" action="/admin/cikis" class="cikis"><span>{kullanici?.ad}</span><button>Çıkış</button></form>
+            <form method="post" action="/admin/cikis" class="cikis"><a href="/admin/sifre" title="Şifre değiştir">{kullanici?.ad}</a><button>Çıkış</button></form>
           </header>
         )}
         <main class="admin-main">{children}</main>
@@ -748,13 +773,14 @@ admin.post("/ilan/:id/riza", async (c) => {
 admin.post("/ilan/:id/sozlesme", async (c) => {
   const id = c.req.param("id");
   const dosya = (await c.req.parseBody()).dosya;
-  if (!(dosya instanceof File) || dosya.type !== "application/pdf" || dosya.size > 20_000_000) {
+  const veri = dosya instanceof File && dosya.size <= 20_000_000 ? Buffer.from(await dosya.arrayBuffer()) : null;
+  if (!veri || !pdfMi(veri)) {
     return c.redirect(`/admin/ilan/${id}?hata=${encodeURIComponent("PDF seçin (en fazla 20 MB).")}`);
   }
   const dizin = join(UPLOAD_DIZIN, "sozlesme");
   await mkdir(dizin, { recursive: true });
   const ad = `${id}-${Date.now()}.pdf`;
-  await writeFile(join(dizin, ad), Buffer.from(await dosya.arrayBuffer()));
+  await writeFile(join(dizin, ad), veri);
   await sql`update ilanlar set yetki_sozlesmesi_url = ${`sozlesme/${ad}`} where id = ${id}`;
   return c.redirect(`/admin/ilan/${id}?ok=1`);
 });
@@ -1033,9 +1059,13 @@ admin.get("/kullanicilar", async (c) => {
           <thead><tr><th>Ad</th><th>E-posta</th><th>Rol</th><th>Durum</th><th></th></tr></thead>
           <tbody>{liste.map((u) => (
             <tr><td>{u.ad}</td><td>{u.eposta}</td><td>{u.rol}</td><td>{u.aktif ? "aktif" : "pasif"}</td>
-              <td>{u.id !== c.get("kullanici").id && (
+              <td>{u.id !== c.get("kullanici").id && (<>
                 <form method="post" action={`/admin/kullanici/${u.id}/aktif`}><button class="metin-dugme">{u.aktif ? "Pasifleştir" : "Aktifleştir"}</button></form>
-              )}</td></tr>
+                <form method="post" action={`/admin/kullanici/${u.id}/sifre`} class="satir-form">
+                  <input name="sifre" type="password" placeholder="Yeni geçici şifre" minlength={10} required autocomplete="new-password" />
+                  <button class="metin-dugme">Şifreyi sıfırla</button>
+                </form>
+              </>)}</td></tr>
           ))}</tbody>
         </table>
       </div>
@@ -1065,6 +1095,49 @@ admin.post("/kullanici/:id/aktif", async (c) => {
   await sql`update kullanicilar set aktif = not aktif where id = ${c.req.param("id")}`;
   await sql`delete from oturumlar where kullanici_id = ${c.req.param("id")}`;
   return c.redirect("/admin/kullanicilar");
+});
+
+// Admin başka kullanıcının şifresini sıfırlar; o kullanıcının açık oturumları kapanır.
+admin.post("/kullanici/:id/sifre", async (c) => {
+  if (c.get("kullanici").rol !== "admin") return c.text("Yetkiniz yok", 403);
+  const sifre = s(await c.req.parseBody(), "sifre") ?? "";
+  if (sifre.length < 10) return c.text("Şifre en az 10 karakter olmalı", 400);
+  await sql`update kullanicilar set sifre_hash = ${await sifreHashle(sifre)} where id = ${c.req.param("id")}`;
+  await sql`delete from oturumlar where kullanici_id = ${c.req.param("id")}`;
+  return c.redirect("/admin/kullanicilar");
+});
+
+// ================= ŞİFRE DEĞİŞTİR (herkes kendi şifresini) =================
+function sifreSayfasi(c: any, hata = "", ok = false) {
+  return c.html(
+    <AdminSayfa baslik="Şifre değiştir" kullanici={c.get("kullanici")}>
+      <h1>Şifre değiştir</h1>
+      {ok && <div class="basari">Şifreniz değişti. Diğer cihazlardaki oturumlarınız kapatıldı.</div>}
+      {hata && <div class="hata">{hata}</div>}
+      <form method="post" action="/admin/sifre" class="form dar">
+        <label>Şu anki şifre<input name="eski" type="password" required autocomplete="current-password" /></label>
+        <label>Yeni şifre (en az 10 karakter)<input name="yeni" type="password" minlength={10} required autocomplete="new-password" /></label>
+        <label>Yeni şifre (tekrar)<input name="tekrar" type="password" minlength={10} required autocomplete="new-password" /></label>
+        <button class="dugme">Değiştir</button>
+      </form>
+    </AdminSayfa>,
+  );
+}
+admin.get("/sifre", (c) => sifreSayfasi(c, "", c.req.query("ok") === "1"));
+admin.post("/sifre", async (c) => {
+  const b = await c.req.parseBody();
+  const k = c.get("kullanici");
+  const anahtar = `sifre-degis:${k.id}`;
+  if (sayi(anahtar, GIRIS_PENCERE) >= 5) return sifreSayfasi(c, "Çok fazla hatalı deneme; 15 dakika sonra tekrar deneyin.");
+  const [r] = await sql<{ sifre_hash: string }[]>`select sifre_hash from kullanicilar where id = ${k.id}`;
+  if (!(await sifreDogru(String(b.eski ?? ""), r.sifre_hash))) { say(anahtar, GIRIS_PENCERE); return sifreSayfasi(c, "Şu anki şifre hatalı."); }
+  const yeni = String(b.yeni ?? "");
+  if (yeni.length < 10) return sifreSayfasi(c, "Yeni şifre en az 10 karakter olmalı.");
+  if (yeni !== b.tekrar) return sifreSayfasi(c, "Yeni şifreler aynı değil.");
+  if (yeni === b.eski) return sifreSayfasi(c, "Yeni şifre eskisiyle aynı olamaz.");
+  await sql`update kullanicilar set sifre_hash = ${await sifreHashle(yeni)} where id = ${k.id}`;
+  await sql`delete from oturumlar where kullanici_id = ${k.id} and id <> ${getCookie(c, "oturum") ?? ""}`;
+  return c.redirect("/admin/sifre?ok=1");
 });
 
 // ================= RADAR EKLENTİSİ =================
@@ -1226,13 +1299,14 @@ admin.post("/avatar/riza", async (c) => {
   const tarihStr = s(b, "tarih");
   const belge = b.belge;
   if (!tarihStr || !/^\d{4}-\d{2}-\d{2}$/.test(tarihStr)) return c.redirect("/admin/avatar?hata=Tarih gerekli");
-  if (!(belge instanceof File) || belge.type !== "application/pdf" || belge.size > 20_000_000) {
+  const veri = belge instanceof File && belge.size <= 20_000_000 ? Buffer.from(await belge.arrayBuffer()) : null;
+  if (!veri || !pdfMi(veri)) {
     return c.redirect("/admin/avatar?hata=İmzalı rıza belgesi PDF olarak yüklenmeli");
   }
   const dizin = join(UPLOAD_DIZIN, "riza");
   await mkdir(dizin, { recursive: true });
   const ad = `avatar-riza-${tarihStr}-${Date.now()}.pdf`;
-  await writeFile(join(dizin, ad), Buffer.from(await belge.arrayBuffer()));
+  await writeFile(join(dizin, ad), veri);
   await avatarAyarKaydet({ riza_tarihi: tarihStr, riza_belgesi: `riza/${ad}`, geri_alindi_at: null });
   return c.redirect("/admin/avatar?ok=1");
 });

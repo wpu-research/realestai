@@ -190,3 +190,10 @@ export function IlanKarti({ i }: { i: IlanKart }) {
 }
 
 export const json = (x: unknown) => raw(JSON.stringify(x).replace(/</g, "\\u003c"));
+
+// Spam tuzağı: ekranda ve ekran okuyucuda görünmez; dolu gelirse form bot sayılır (server.tsx).
+export const Tuzak = () => (
+  <div class="tuzak" aria-hidden="true">
+    <label>Web sitesi<input name="web_sitesi" tabindex={-1} autocomplete="off" /></label>
+  </div>
+);

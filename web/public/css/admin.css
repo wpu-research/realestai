@@ -6,6 +6,8 @@ body.admin { background: #f4f6f7; }
 .admin-ust nav a { color: #d7e4ea; text-decoration: none; white-space: nowrap; font-weight: 500; }
 .admin-ust nav a:hover { color: #fff; }
 .cikis { display: flex; align-items: center; gap: 10px; font-size: .85rem; }
+.cikis a { color: #fff; text-decoration: none; }
+.cikis a:hover { text-decoration: underline; }
 .cikis button { background: none; border: 1px solid #ffffff55; color: #fff; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
 .admin-main { max-width: 1300px; margin: 0 auto; padding: 20px 16px 60px; }
 .admin h1 { font-family: Inter, sans-serif; font-size: 1.5rem; }

@@ -9,6 +9,7 @@ import { ilkYonetici } from "./auth.js";
 import { getCookie, setCookie } from "hono/cookie";
 import { DILLER, dilIle, t, type Dil } from "./lib/dil.js";
 import { seo } from "./routes/seo.js";
+import { istemciIp, say } from "./lib/sinir.js";
 import { UPLOAD_DIZIN } from "./config.js";
 import { migrate, sql } from "./db.js";
 import { radarPuanla } from "./lib/radar.js";
@@ -61,6 +62,19 @@ app.use("/uploads/ilan/*", serveStatic({
   rewriteRequestPath: (p) => p.replace(/^\/uploads/, ""),
 }));
 
+// Herkese açık formlar (talep, başvuru, emlakçı bul, ekspertiz): tuzak alanı doluysa bot sayılır ve
+// sessizce "gönderildi" sayfasına dönülür; insanlar için IP başına saatte 15 gönderim.
+const FORM_YOLU = /^\/(ilan\/\d+\/talep|evimi-listele|emlakci-bul|ekspertiz)$/;
+app.use("*", async (c, next) => {
+  if (c.req.method !== "POST" || !FORM_YOLU.test(c.req.path)) return next();
+  const b = await c.req.parseBody();
+  const geri = c.req.path.endsWith("/talep") ? c.req.path.replace(/\/talep$/, "?talep=ok") : `${c.req.path}?ok=1`;
+  if (typeof b.web_sitesi === "string" && b.web_sitesi.trim()) return c.redirect(geri);
+  if (say(`form:${istemciIp(c.req.header.bind(c.req))}`, 3600_000) > 15) {
+    return c.text(t("Çok fazla istek; biraz sonra deneyin."), 429);
+  }
+  return next();
+});
 app.route("/", seo);
 app.route("/api", api);
 app.route("/eklenti-api", eklenti);

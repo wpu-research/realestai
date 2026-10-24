@@ -9,7 +9,7 @@ import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
 import { Ara, Ayar, Konum, Mikrofon, Ok, Onay } from "../views/ikon.js";
-import { demoDerinligi, demoGorselleri, Fiyat, IlanKarti, ilanMetni, json, mahalleGorseli, ornekGorsel, Sayfa } from "../views/layout.js";
+import { demoDerinligi, demoGorselleri, Fiyat, IlanKarti, ilanMetni, json, mahalleGorseli, ornekGorsel, Sayfa, Tuzak } from "../views/layout.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 
 const etiket = (liste: { k: string; e: string }[], k: string | null) => (k ? t(liste.find((x) => x.k === k)?.e ?? k) : null);
@@ -255,6 +255,7 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
               <h3>{t("Bu ilanla ilgileniyorum")}</h3>
               {gonderildi ? <div class="basari">{t("Teşekkürler! Ekibimiz en kısa sürede size dönecek.")}</div> : (
                 <form method="post" action={`/ilan/${i.ilan_no}/talep`} class="form" data-kvkk-form>
+              <Tuzak />
                   <input name="ad_soyad" placeholder={t("Ad soyad")} required />
                   <input name="telefon" placeholder={t("Telefon")} type="tel" />
                   <input name="eposta" placeholder={t("E-posta")} type="email" />
@@ -332,6 +333,7 @@ site.get("/evimi-listele", async (c) => {
           <p class="alt-baslik">{t("Bilgilerinizi bırakın; ekibimiz sizi arayıp süreci anlatsın. Listeleme ücretsizdir.")}</p>
           {ok ? <div class="kart-kutu"><div class="basari">{t("Başvurunuz alındı, teşekkürler! En kısa sürede sizi arayacağız.")}</div></div> : (
             <form method="post" class="kart-kutu form" data-kvkk-form>
+              <Tuzak />
               <div class="iki">
                 <label>{t("Ad soyad *")}<input name="ad_soyad" required /></label>
                 <label>{t("Telefon *")}<input name="telefon" type="tel" required /></label>

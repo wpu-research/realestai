@@ -6,7 +6,7 @@ import { KUR } from "../lib/arama.js";
 import { para } from "../lib/bicim.js";
 import { ESKI_GUN, gunOnce, krediOranlari } from "../lib/kredi-oran.js";
 import { formKaynagi } from "../lib/kaynak.js";
-import { json, Sayfa } from "../views/layout.js";
+import { json, Sayfa, Tuzak } from "../views/layout.js";
 
 // Emlak endeksi, kredi hesaplama, bana emlakçı bul, rehberler ve kaydedilenler.
 export const araclar = new Hono();
@@ -193,6 +193,7 @@ araclar.get("/emlakci-bul", (c) => {
           <p class="alt-baslik">{t("Ne aradığınızı anlatın; bölgeyi bilen bir danışmanımız sizi arasın, uygun evleri birlikte bulalım.")}</p>
           {ok ? <div class="kart-kutu"><div class="basari">{t("Talebiniz alındı. Danışmanımız en kısa sürede sizinle iletişime geçecek.")}</div></div> : (
             <form method="post" class="kart-kutu form" data-kvkk-form>
+              <Tuzak />
               <div class="iki">
                 <label>{t("Ad soyad *")}<input name="ad_soyad" required /></label>
                 <label>{t("Telefon *")}<input name="telefon" type="tel" required /></label>
@@ -251,6 +252,7 @@ araclar.get("/ekspertiz", async (c) => {
           <p class="alt-baslik">{t("Evin piyasa değerini ve yasal durumunu bağımsız bir değerleme raporuyla öğrenin. Raporu SPK lisanslı değerleme uzmanları hazırlar; ücret ve süreyi danışmanımız size iletir.")}</p>
           {ok ? <div class="kart-kutu"><div class="basari">{t("Talebiniz alındı. Danışmanımız ekspertiz için sizinle iletişime geçecek.")}</div></div> : (
             <form method="post" class="kart-kutu form" data-kvkk-form>
+              <Tuzak />
               {ilan && <div class="kum-not">{t("İlan:")} <strong>#{ilan.ilan_no} {ilan.baslik}</strong> ({ilan.mahalle})</div>}
               <input type="hidden" name="ilan_no" value={ilan?.ilan_no ?? ""} />
               <div class="iki">

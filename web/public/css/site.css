@@ -561,3 +561,5 @@ dialog.uc-boyut::backdrop { background: rgba(10, 20, 30, .65); }
 .uc-boyut-filigran { position: absolute; right: 10px; bottom: 10px; background: rgba(0,0,0,.6); color: #fff; font-size: .75rem; font-weight: 600; padding: 4px 10px; border-radius: 6px; pointer-events: none; }
 .uc-boyut-uyari { font-size: .82rem; color: var(--muted-foreground); background: var(--sand); border-radius: 10px; padding: 10px 12px; margin: 10px 0 0; }
 dialog.uc-boyut .galeri-kucuk { margin-top: 8px; }
+
+.tuzak { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
