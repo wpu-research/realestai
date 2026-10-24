@@ -526,3 +526,7 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
   .filtre-panel.acik { box-shadow: 0 -10px 40px rgba(0,0,0,.2), 0 0 0 100vmax rgba(0,0,0,.35); }
 }
 .endeks-tablo td strong { white-space: nowrap; }
+/* Klon ses: ses şiddetine göre (--ses 0..1) halka ve hafif nefes */
+.avatar { --ses: 0; transition: box-shadow .08s linear; }
+.avatar.klon.konusuyor { animation: none; box-shadow: 0 0 0 calc(var(--ses) * 16px) color-mix(in oklab, var(--primary) 30%, transparent); }
+.avatar.klon.konusuyor img { transform: scale(calc(1 + var(--ses) * .03)); transition: transform .08s linear; }

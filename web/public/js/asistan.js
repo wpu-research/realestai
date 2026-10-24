@@ -19,14 +19,70 @@ let durum = { mesajlar: [], filtreler: {}, oturum_id: null, url: null };
 try { Object.assign(durum, JSON.parse(sessionStorage.getItem(KAYIT) || "{}")); } catch {}
 const kaydet = () => { try { sessionStorage.setItem(KAYIT, JSON.stringify(durum)); } catch {} };
 
-// ---- Avatar arayüzü (FotoAvatar). VideoAvatar aynı iki fonksiyonu sağlayacak. ----
+// ---- Avatar arayüzü: konus(metin, bitti, imza) ve sus(). ----
+// Klon ses açıksa Didem'in sesi sunucudan gelir (yalnız imzalı metinler); değilse ya da hata olursa tarayıcı sesi.
+// Video avatar sağlayıcısı seçilince aynı iki fonksiyonu sağlayan ayrı bir uygulama buraya takılır.
+const AYAR = (() => { try { return JSON.parse(document.getElementById("avatar-ayar").textContent); } catch { return { mod: "tarayici" }; } })();
+let sesBaglam = null, kaynak = null, kare = null, sira = 0;
+
+// iOS Safari sesi yalnız kullanıcı dokunuşunda açılan AudioContext'le çalar; "başla" düğmesinde açılır.
+function sesKilidiniAc() {
+  if (AYAR.mod !== "klon" || sesBaglam) return;
+  try { sesBaglam = new (window.AudioContext || window.webkitAudioContext)(); sesBaglam.resume(); } catch { sesBaglam = null; }
+}
+
+async function klonlaOku(metin, imza, benim) {
+  const r = await fetch("/api/ses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metin, imza }) });
+  if (!r.ok) throw new Error(`ses ${r.status}`);
+  const tampon = await sesBaglam.decodeAudioData(await r.arrayBuffer());
+  if (benim !== sira) return null;                       // bu arada başka bir şey söylendi ya da susturuldu
+  const analiz = sesBaglam.createAnalyser();
+  analiz.fftSize = 512;
+  const k = sesBaglam.createBufferSource();
+  k.buffer = tampon;
+  k.connect(analiz).connect(sesBaglam.destination);
+  const veri = new Uint8Array(analiz.fftSize);
+  const ciz = () => {
+    analiz.getByteTimeDomainData(veri);
+    let t = 0;
+    for (const v of veri) t += ((v - 128) / 128) ** 2;
+    avatarEl.style.setProperty("--ses", Math.min(1, Math.sqrt(t / veri.length) * 4).toFixed(3));
+    kare = requestAnimationFrame(ciz);
+  };
+  kaynak = k;
+  k.start();
+  ciz();
+  return k;
+}
+
 const avatar = {
-  konus(metin, bitti) {
+  konus(metin, bitti, imza) {
+    const benim = ++sira;
     avatarEl.classList.add("konusuyor");
     altyazi.textContent = metin;
-    soyle(metin, { bitti: () => { avatarEl.classList.remove("konusuyor"); bitti?.(); } });
+    const son = () => {
+      if (benim !== sira) return;
+      cancelAnimationFrame(kare);
+      avatarEl.style.setProperty("--ses", "0");
+      avatarEl.classList.remove("konusuyor");
+      bitti?.();
+    };
+    const tarayici = () => soyle(metin, { bitti: son });
+    if (AYAR.mod !== "klon" || !imza || !sesBaglam) return tarayici();
+    avatarEl.classList.add("klon");
+    klonlaOku(metin, imza, benim)
+      .then((k) => { if (k) k.onended = son; })
+      .catch(() => { if (benim === sira) tarayici(); });
   },
-  sus() { sustur(); avatarEl.classList.remove("konusuyor"); },
+  sus() {
+    sira++;
+    sustur();
+    try { kaynak?.stop(); } catch {}
+    kaynak = null;
+    cancelAnimationFrame(kare);
+    avatarEl.style.setProperty("--ses", "0");
+    avatarEl.classList.remove("konusuyor");
+  },
 };
 
 let tanima = null;
@@ -94,9 +150,9 @@ async function gonder(metin) {
   ciz();
   try {
     const y = await postJson("/api/asistan", {
-      mesajlar: durum.mesajlar, filtreler: durum.filtreler, dil: SAYFA_DILI, oturum_id: durum.oturum_id,
+      mesajlar: durum.mesajlar.map(({ rol, metin }) => ({ rol, metin })), filtreler: durum.filtreler, dil: SAYFA_DILI, oturum_id: durum.oturum_id,
     });
-    durum.mesajlar.push({ rol: "asistan", metin: y.cevap });
+    durum.mesajlar.push({ rol: "asistan", metin: y.cevap, imza: y.imza ?? null });
     durum.filtreler = y.filtreler ?? durum.filtreler;
     durum.oturum_id = y.oturum_id ?? durum.oturum_id;
     durum.url = y.url;
@@ -105,7 +161,7 @@ async function gonder(metin) {
     avatar.konus(y.cevap, () => {
       if (y.tamamlandi) location.href = y.url;
       else dinlemeyiBaslat();
-    });
+    }, y.imza);
   } catch {
     altyazi.textContent = t("Şu an bağlantı kuramıyorum, sihirbazla devam edebilirsiniz.");
     secenekEl.innerHTML = `<a class="dugme" href="/sihirbaz">${t("Sihirbaza geç")}</a>`;
@@ -125,11 +181,15 @@ if (durum.mesajlar.length) {
   ciz();
 }
 basla.addEventListener("click", () => {
+  sesKilidiniAc();
   basla.hidden = true;
   giris.hidden = false;
   if (durum.mesajlar.length) {
     const son = durum.mesajlar.at(-1);
-    if (son.rol === "asistan") avatar.konus(t("Kaldığımız yerden devam edelim.") + " " + son.metin, dinlemeyiBaslat);
+    if (son.rol === "asistan") {
+      const d = AYAR.sabit?.devam ?? { metin: t("Kaldığımız yerden devam edelim.") };
+      avatar.konus(d.metin, () => avatar.konus(son.metin, dinlemeyiBaslat, son.imza), d.imza);
+    }
     else gonder(null);
   } else gonder(null);
 });

@@ -76,6 +76,20 @@ oturum en fazla 5 dakika; sessizlikte 30 sn sonra kapanır; günlük toplam daki
 
 ## 5. Aşamalar
 
+**Durum (2026-10-24):** Aşama 1 ve sağlayıcıdan bağımsız ses katmanı tamam (Hono uygulaması, `web/`):
+- Admin → **Avatar** (yalnız admin): yazılı rıza (tarih + imzalı PDF), fotoğraf, ses modu, günlük karakter
+  sınırı ve kullanım, ses denemesi, **rızayı geri al** (fotoğraf, ses önbelleği ve ElevenLabs ses modeli
+  silinir, site anında genel görsel + tarayıcı sesine döner). Okuma metni: Admin → Avatar → kayıt metni.
+- Klon ses: ElevenLabs (`ELEVENLABS_API_KEY`, `ELEVENLABS_SES_ID`, isteğe bağlı `ELEVENLABS_MODEL`).
+  `/api/ses` yalnız sunucunun imzaladığı metni okur (asistan cevapları + sayfadaki sabit cümleler);
+  kimse Didem'in sesiyle keyfi cümle söyletemez. Aynı cümle bir kez üretilip diskte saklanır.
+- Sitede: rıza yoksa ya da geri alındıysa fotoğraf ve klon ses gösterilmez. Klon seste fotoğraf, sesin
+  şiddetine göre canlanır.
+- Rıza metni taslağı: `docs/avatar-riza.md` (avukat onayı bekliyor).
+- Kalan: video avatar sağlayıcısı (aşağıdaki ölçütlerle deneme), video kaydı ve sağlayıcının rıza videosu.
+
+Orijinal plan:
+
 1. **Şimdi (Lovable Prompt 8)**: Asistan konuşma akışı + Didem'in fotoğrafı + tarayıcının kendi
    sesi (ücretsiz). Avatar katmanı değiştirilebilir bileşen olarak yazılır.
 2. **Didem kaydı + rıza** → sağlayıcıyla 1 haftalık deneme (Türkçe kalite, gecikme, maliyet).

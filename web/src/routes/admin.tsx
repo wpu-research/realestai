@@ -12,6 +12,10 @@ import { sql } from "../db.js";
 import { csvOku } from "../lib/csv.js";
 import { radarPuanla } from "../lib/radar.js";
 import { anahtarUret, eklentiPaketi } from "./eklenti.js";
+import {
+  AVATAR_DIZIN, avatarAyar, avatarAyarKaydet, klonSesAcik, rizaGecerli, rizayiGeriAl, SesHatasi, sesAnahtarlariVar, sesUret,
+} from "../lib/avatar.js";
+import { KAYIT_BOLUMLERI, KAYIT_KURALLARI } from "../lib/kayit-metni.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_ANAHTARLARI, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 import {
   ADAY_DURUM_ETIKET, BAYRAK_ETIKET, fiyatMetni, ODA_ETIKET, para, tarih, TIP_ETIKET, TUR_ETIKET, yuzde,
@@ -71,6 +75,7 @@ function AdminSayfa({ baslik, children, menu = true, kullanici, scriptler = [] }
               <a href="/admin/talepler">Talepler</a>
               <a href="/admin/olcum">Ölçüm</a>
               <a href="/admin/eklenti">Radar eklentisi</a>
+              {kullanici?.rol === "admin" && <a href="/admin/avatar">Avatar</a>}
               {kullanici?.rol === "admin" && <a href="/admin/kullanicilar">Kullanıcılar</a>}
             </nav>
             <form method="post" action="/admin/cikis" class="cikis"><span>{kullanici?.ad}</span><button>Çıkış</button></form>
@@ -984,3 +989,178 @@ admin.get("/eklenti/indir", async (c) => {
     "Content-Type": "application/zip", "Content-Disposition": 'attachment; filename="realestai-radar.zip"',
   });
 });
+
+// ================= AVATAR (yalnız admin) =================
+// Didem'in ses ve görüntüsü biyometrik veridir: her şey yazılı rızaya bağlı, geri alma tek düğme.
+admin.use("/avatar/*", async (c, next) => (c.get("kullanici").rol === "admin" ? next() : c.text("Yetkiniz yok", 403)));
+admin.use("/avatar", async (c, next) => (c.get("kullanici").rol === "admin" ? next() : c.text("Yetkiniz yok", 403)));
+
+admin.get("/avatar", async (c) => {
+  const a = await avatarAyar();
+  const kullanim = await sql`select gun, karakter, istek, onbellek from ses_kullanim order by gun desc limit 14`;
+  const bugun = kullanim.find((k) => new Date(k.gun).toDateString() === new Date().toDateString());
+  const hata = c.req.query("hata");
+  const durumSatiri = (tamam: boolean, metin: Child) => <li class={tamam ? "tamam" : "eksik"}>{tamam ? "✓" : "✗"} {metin}</li>;
+  return c.html(
+    <AdminSayfa baslik="Avatar" kullanici={c.get("kullanici")}>
+      <h1>Didem avatarı</h1>
+      {hata && <div class="hata">{hata}</div>}
+      {c.req.query("ok") && <div class="basari">Kaydedildi.</div>}
+      <div class="kutu-panel">
+        <h2>Durum</h2>
+        <ul class="kontrol">
+          {durumSatiri(rizaGecerli(a), a.geri_alindi_at
+            ? <>Rıza {tarih(a.geri_alindi_at)} tarihinde <b>geri alındı</b> — yeniden kullanım için yeni yazılı rıza gerekir</>
+            : a.riza_tarihi ? <>Yazılı açık rıza: {a.riza_tarihi}{a.riza_belgesi && <> · <a href="/admin/avatar/riza-belgesi">belge</a></>}</> : "Yazılı açık rıza girilmedi")}
+          {durumSatiri(!!a.foto, a.foto ? "Fotoğraf yüklendi (sitede yalnız rıza geçerliyken görünür)" : "Fotoğraf yok — sitede genel görsel")}
+          {durumSatiri(sesAnahtarlariVar(), sesAnahtarlariVar()
+            ? `ElevenLabs bağlı (model ${process.env.ELEVENLABS_MODEL ?? "eleven_multilingual_v2"})`
+            : "Railway'de ELEVENLABS_API_KEY ve ELEVENLABS_SES_ID tanımlı değil")}
+          {durumSatiri(klonSesAcik(a), klonSesAcik(a) ? "Sitede Didem'in klon sesi açık" : "Sitede tarayıcının kendi sesi kullanılıyor")}
+          {durumSatiri(false, "Video avatar: sağlayıcı seçimi bekliyor")}
+        </ul>
+      </div>
+
+      <div class="kutu-panel">
+        <h2>1. Yazılı açık rıza</h2>
+        <p class="kucuk">Taslak metin: <code>docs/avatar-riza.md</code> (avukata gösterilecek). İmzalı PDF'i yükleyin; belge herkese açık klasöre konmaz.</p>
+        <form method="post" action="/admin/avatar/riza" enctype="multipart/form-data" class="satir-form">
+          <label>Rıza tarihi<input type="date" name="tarih" required /></label>
+          <label>İmzalı belge (PDF)<input type="file" name="belge" accept="application/pdf" required /></label>
+          <button class="dugme">Kaydet</button>
+        </form>
+      </div>
+
+      <div class="kutu-panel">
+        <h2>2. Fotoğraf</h2>
+        <p class="kucuk">Yüz ortada, omuzlar görünsün; kare kırpılır. Video avatar gelene kadar asistan sayfasında bu fotoğraf konuşurken canlanır.</p>
+        <form method="post" action="/admin/avatar/foto" enctype="multipart/form-data" class="satir-form">
+          <input type="file" name="foto" accept="image/*" required disabled={!rizaGecerli(a)} />
+          <button class="dugme" disabled={!rizaGecerli(a)}>Yükle</button>
+          {a.foto && <img src={`/avatar/foto?v=${encodeURIComponent(a.foto)}`} alt="" width={64} height={64} style="border-radius:50%" />}
+        </form>
+      </div>
+
+      <div class="kutu-panel">
+        <h2>3. Ses</h2>
+        <p class="kucuk">Ses klonu ElevenLabs'te oluşturulur (Didem'in kayıtları + rıza doğrulaması); oluşan ses kimliği Railway'e
+          <code>ELEVENLABS_SES_ID</code> olarak girilir. Okuma metni: <a href="/admin/avatar/kayit-metni">kayıt metni ve kurallar</a>.</p>
+        <form method="post" action="/admin/avatar/ayar" class="form dar">
+          <label class="kutu"><input type="radio" name="mod" value="tarayici" checked={a.mod === "tarayici"} /> Tarayıcı sesi (ücretsiz, robotik)</label>
+          <label class="kutu"><input type="radio" name="mod" value="klon" checked={a.mod === "klon"} disabled={!rizaGecerli(a) || !sesAnahtarlariVar()} /> Didem'in klon sesi</label>
+          <label>Günlük karakter sınırı<input name="gunluk_karakter" type="number" min={0} step={1000} value={String(a.gunluk_karakter)} /></label>
+          <p class="kucuk">Sınır dolunca site o gün tarayıcı sesine döner. Aynı cümle bir kez üretilip saklanır, tekrarında ücret yok.</p>
+          <button class="dugme">Kaydet</button>
+        </form>
+        <form method="post" action="/admin/avatar/dene" target="_blank" class="satir-form" style="margin-top:12px">
+          <input name="metin" maxlength={600} value="Merhaba, ben Didem'in yapay zekâ asistanıyım. Gümüşlük'te gecesi 8 bin liraya havuzlu bir villa var." />
+          <button class="dugme ikincil" disabled={!klonSesAcik(a)}>Dinle</button>
+        </form>
+        <h3>Kullanım (son 14 gün)</h3>
+        <p class="kucuk">Bugün: {bugun?.karakter ?? 0} / {a.gunluk_karakter} karakter.</p>
+        <div class="tablo-kap"><table class="tablo">
+          <thead><tr><th>Gün</th><th>Üretilen karakter</th><th>Üretim</th><th>Önbellekten</th></tr></thead>
+          <tbody>{kullanim.map((k) => <tr><td>{tarih(k.gun)}</td><td>{k.karakter}</td><td>{k.istek}</td><td>{k.onbellek}</td></tr>)}</tbody>
+        </table></div>
+      </div>
+
+      <div class="kutu-panel">
+        <h2>Rızayı geri al</h2>
+        <p>Didem rızasını geri alırsa ya da işten ayrılırsa: sitede ses ve fotoğraf hemen kapanır, fotoğraf ve kayıtlı sesler
+          sunucudan, ses modeli ElevenLabs'ten silinir. Bu işlem geri alınamaz.</p>
+        <form method="post" action="/admin/avatar/geri-al" onsubmit="return confirm('Didem\'in ses ve görüntü verileri silinecek. Emin misiniz?')">
+          <button class="dugme tehlike">Rızayı geri al ve verileri sil</button>
+        </form>
+      </div>
+    </AdminSayfa>,
+  );
+});
+
+admin.post("/avatar/riza", async (c) => {
+  const b = await c.req.parseBody();
+  const tarihStr = s(b, "tarih");
+  const belge = b.belge;
+  if (!tarihStr || !/^\d{4}-\d{2}-\d{2}$/.test(tarihStr)) return c.redirect("/admin/avatar?hata=Tarih gerekli");
+  if (!(belge instanceof File) || belge.type !== "application/pdf" || belge.size > 20_000_000) {
+    return c.redirect("/admin/avatar?hata=İmzalı rıza belgesi PDF olarak yüklenmeli");
+  }
+  const dizin = join(UPLOAD_DIZIN, "riza");
+  await mkdir(dizin, { recursive: true });
+  const ad = `avatar-riza-${tarihStr}-${Date.now()}.pdf`;
+  await writeFile(join(dizin, ad), Buffer.from(await belge.arrayBuffer()));
+  await avatarAyarKaydet({ riza_tarihi: tarihStr, riza_belgesi: `riza/${ad}`, geri_alindi_at: null });
+  return c.redirect("/admin/avatar?ok=1");
+});
+admin.get("/avatar/riza-belgesi", async (c) => {
+  const a = await avatarAyar();
+  if (!a.riza_belgesi?.startsWith("riza/")) return c.notFound();
+  return c.body(new Uint8Array(await readFile(join(UPLOAD_DIZIN, a.riza_belgesi))), 200, { "Content-Type": "application/pdf" });
+});
+
+admin.post("/avatar/foto", async (c) => {
+  const a = await avatarAyar();
+  if (!rizaGecerli(a)) return c.redirect("/admin/avatar?hata=Önce yazılı rıza girilmeli");
+  const f = (await c.req.parseBody()).foto;
+  if (!(f instanceof File) || !f.type.startsWith("image/") || f.size > 25_000_000) return c.redirect("/admin/avatar?hata=Geçerli bir fotoğraf seçin");
+  // EXIF silinir, yüz odaklı kare kırpılır.
+  const webp = await sharp(Buffer.from(await f.arrayBuffer())).rotate()
+    .resize(640, 640, { fit: "cover", position: sharp.strategy.attention }).webp({ quality: 85 }).toBuffer();
+  await mkdir(AVATAR_DIZIN, { recursive: true });
+  const ad = `didem-${Date.now()}.webp`;
+  await writeFile(join(AVATAR_DIZIN, ad), webp);
+  if (a.foto) await unlink(join(AVATAR_DIZIN, a.foto)).catch(() => {});
+  await avatarAyarKaydet({ foto: ad });
+  return c.redirect("/admin/avatar?ok=1");
+});
+
+admin.post("/avatar/ayar", async (c) => {
+  const b = await c.req.parseBody();
+  const a = await avatarAyar();
+  const mod = s(b, "mod") === "klon" ? "klon" : "tarayici";
+  if (mod === "klon" && (!rizaGecerli(a) || !sesAnahtarlariVar())) return c.redirect("/admin/avatar?hata=Klon ses için rıza ve ElevenLabs anahtarları gerekli");
+  const sinir = n(b, "gunluk_karakter");
+  await avatarAyarKaydet({ mod, gunluk_karakter: sinir != null ? Math.max(0, Math.round(sinir)) : a.gunluk_karakter });
+  return c.redirect("/admin/avatar?ok=1");
+});
+
+admin.post("/avatar/dene", async (c) => {
+  const metin = s(await c.req.parseBody(), "metin") ?? "";
+  try {
+    return c.body(new Uint8Array(await sesUret(metin)), 200, { "Content-Type": "audio/mpeg" });
+  } catch (e) {
+    return c.text(e instanceof SesHatasi ? e.message : "ses üretilemedi", e instanceof SesHatasi ? e.durum : 500);
+  }
+});
+
+admin.post("/avatar/geri-al", async (c) => {
+  const rapor = await rizayiGeriAl();
+  console.log(`avatar rızası geri alındı (${c.get("kullanici").eposta})`);
+  return c.html(
+    <AdminSayfa baslik="Rıza geri alındı" kullanici={c.get("kullanici")}>
+      <h1>Rıza geri alındı</h1>
+      <ul class="kontrol">{rapor.map((r) => <li>{r}</li>)}</ul>
+      <a href="/admin/avatar" class="dugme">Avatar sayfasına dön</a>
+    </AdminSayfa>,
+  );
+});
+
+admin.get("/avatar/kayit-metni", (c) =>
+  c.html(
+    <AdminSayfa baslik="Kayıt metni" kullanici={c.get("kullanici")}>
+      <a href="/admin/avatar" class="geri">← Avatar</a>
+      <h1>Ses kaydı — okuma metni</h1>
+      <div class="kutu-panel">
+        <h2>Kurallar</h2>
+        <ul>{KAYIT_KURALLARI.map((k) => <li>{k}</li>)}</ul>
+        <p class="kucuk">Video kaydı kuralları ve rıza videosu, video avatar sağlayıcısı seçilince eklenecek (bkz. <code>docs/avatar-didem.md</code>).</p>
+      </div>
+      {KAYIT_BOLUMLERI.map((b) => (
+        <div class="kutu-panel">
+          <h2>{b.baslik}</h2>
+          <p class="kucuk">{b.not}</p>
+          {b.satirlar.length > 0 && <ol class="okuma">{b.satirlar.map((x) => <li>{x}</li>)}</ol>}
+        </div>
+      ))}
+    </AdminSayfa>,
+  ),
+);

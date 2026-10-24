@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { t } from "../lib/dil.js";
+import { avatarAyar, imzala, imzaDogru, klonSesAcik, SesHatasi, sesUret } from "../lib/avatar.js";
 
 export const api = new Hono();
 
@@ -54,10 +55,29 @@ api.post("/asistan", async (c) => {
                   values ('avatar', ${dil}, ${sql.json(sonuc.filtreler as any)}, ${sonuc.tamamlandi}, 1) returning id`;
       }
     } catch (e) { console.error("oturum kaydı", e); }
-    return c.json({ ...sonuc, oturum_id: id, url: `/ara?${filtreUrl(sonuc.filtreler)}` });
+    // İmza: /api/ses yalnız asistanın bu cevabını Didem'in sesiyle okur.
+    const imza = klonSesAcik(await avatarAyar()) ? await imzala(sonuc.cevap) : null;
+    return c.json({ ...sonuc, imza, oturum_id: id, url: `/ara?${filtreUrl(sonuc.filtreler)}` });
   } catch (e) {
     console.error("asistan", e);
     return c.json({ hata: "asistan şu an yanıt veremiyor" }, 500);
+  }
+});
+
+// Didem'in klon sesi. Yalnız imzalı (asistanın ürettiği ya da sayfadaki sabit) metinler okunur.
+api.post("/ses", async (c) => {
+  if (sinirAsildi(`ses:${ipAl(c.req.header.bind(c.req))}`, 80)) return c.json({ hata: "çok fazla istek" }, 429);
+  const { metin, imza } = await c.req.json<{ metin?: string; imza?: string }>().catch(() => ({} as { metin?: string; imza?: string }));
+  if (typeof metin !== "string" || typeof imza !== "string" || !(await imzaDogru(metin, imza))) {
+    return c.json({ hata: "imza geçersiz" }, 403);
+  }
+  try {
+    const ses = await sesUret(metin);
+    return c.body(new Uint8Array(ses), 200, { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=3600" });
+  } catch (e) {
+    if (e instanceof SesHatasi) return c.json({ hata: e.message }, e.durum);
+    console.error("ses", e);
+    return c.json({ hata: "ses üretilemedi" }, 500);
   }
 });
 

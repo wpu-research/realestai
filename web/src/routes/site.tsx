@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { AVATAR_DIZIN, avatarAyar, fotoGosterilir, imzala, klonSesAcik } from "../lib/avatar.js";
 import { dil, t } from "../lib/dil.js";
 import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
@@ -350,13 +353,31 @@ site.get("/sihirbaz", async (c) => {
   );
 });
 
-site.get("/asistan", (c) =>
-  c.html(
+// Didem'in fotoğrafı yalnız geçerli rıza varken verilir; rıza geri alınınca hemen 404 olur.
+site.get("/avatar/foto", async (c) => {
+  const a = await avatarAyar();
+  if (!fotoGosterilir(a)) return c.notFound();
+  const veri = await readFile(join(AVATAR_DIZIN, a.foto!)).catch(() => null);
+  if (!veri) return c.notFound();
+  return c.body(new Uint8Array(veri), 200, { "Content-Type": "image/webp", "Cache-Control": "public, max-age=300" });
+});
+
+site.get("/asistan", async (c) => {
+  const a = await avatarAyar();
+  const klon = klonSesAcik(a);
+  const devam = t("Kaldığımız yerden devam edelim.");
+  const ayar = {
+    mod: klon ? "klon" : "tarayici",
+    sabit: klon ? { devam: { metin: devam, imza: await imzala(devam) } } : { devam: { metin: devam, imza: null } },
+  };
+  return c.html(
     <Sayfa baslik={t("Didem'le konuşarak ara")} scriptler={["/js/asistan.js"]}>
       <div class="asistan-kap" data-asistan>
         <div class="avatar-alan">
           <div class="ai-etiket">{t("Yapay zekâ asistanı — Didem'in görünüşü ve sesiyle")}</div>
-          <div class="avatar" data-avatar><img src="/img/didem.svg" alt={t("Didem'in yapay zekâ asistanı")} /></div>
+          <div class="avatar" data-avatar>
+            <img src={fotoGosterilir(a) ? `/avatar/foto?v=${encodeURIComponent(a.foto!)}` : "/img/didem.svg"} alt={t("Didem'in yapay zekâ asistanı")} />
+          </div>
           <div class="altyazi" data-altyazi>{t("Merhaba! Başlamak için aşağıdaki düğmeye dokunun.")}</div>
         </div>
         <div class="anlasilan" data-anlasilan></div>
@@ -375,9 +396,10 @@ site.get("/asistan", (c) =>
           <a href="/evimi-listele?gercek=1" data-gercek> {t("Gerçek biriyle konuşmak istiyorum")}</a>
         </div>
       </div>
+      <script id="avatar-ayar" type="application/json">{json(ayar)}</script>
     </Sayfa>,
-  ),
-);
+  );
+});
 
 // ---------- Yasal (taslak) ----------
 const YASAL: Record<string, [string, string]> = {
