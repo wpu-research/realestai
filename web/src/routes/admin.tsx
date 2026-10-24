@@ -16,6 +16,8 @@ import {
   AVATAR_DIZIN, avatarAyar, avatarAyarKaydet, klonSesAcik, rizaGecerli, rizayiGeriAl, SesHatasi, sesAnahtarlariVar, sesUret,
 } from "../lib/avatar.js";
 import { KAYIT_BOLUMLERI, KAYIT_KURALLARI } from "../lib/kayit-metni.js";
+import { aramaRehberi, takipMesaji, waNumara } from "../lib/arama-rehberi.js";
+import { istek } from "../lib/dil.js";
 import { ESKI_GUN, gunOnce, krediOranlari, krediOranlariKaydet, oranlariAyikla, type KrediOranlari } from "../lib/kredi-oran.js";
 import { SIRKET_ZORUNLU, siteAyar, siteAyarKaydet, type SiteAyar } from "../lib/site-ayar.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_ANAHTARLARI, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
@@ -261,6 +263,16 @@ admin.post("/adaylar/csv", async (c) => {
   );
 });
 
+// KVKK: sahip silinmesini isterse ad, telefon ve notlar hemen silinir (arama notları dahil); ilan bilgisi kalır.
+admin.post("/aday/:id/veri-sil", async (c) => {
+  const id = c.req.param("id");
+  await sql.begin(async (tx) => {
+    await tx`update adaylar set telefon = null, sahip_adi = null, notlar = null, updated_at = now() where id = ${id}`;
+    await tx`update arama_gecmisi set not_metni = null where aday_id = ${id}`;
+  });
+  return c.redirect(`/admin/aday/${id}?silindi=1`);
+});
+
 admin.get("/aday/:id", async (c) => {
   const id = c.req.param("id");
   const [a] = await sql`select a.*, m.ad as mahalle, u.ad as atanan_ad from adaylar a
@@ -277,6 +289,7 @@ admin.get("/aday/:id", async (c) => {
         <span class={`durum d-${a.durum}`}>{ADAY_DURUM_ETIKET[a.durum]}</span>
       </div>
       {c.req.query("hata") && <div class="hata">{c.req.query("hata")}</div>}
+      {c.req.query("silindi") && <div class="basari">Sahibin adı, telefonu ve notları silindi.</div>}
       <div class="aday-izgara">
         <section class="kutu-panel">
           {a.telefon
@@ -316,14 +329,20 @@ admin.get("/aday/:id", async (c) => {
         </section>
 
         <section class="kutu-panel">
-          <details open={gecmis.length === 0}>
-            <summary><strong>Arama scripti</strong></summary>
-            <p class="script">
-              "Merhaba, ben {k.ad}, {SITE_ADI}'ndan arıyorum. {a.kaynak}'taki {a.mahalle ?? ""} {TIP_ETIKET[a.tip]?.toLowerCase()} ilanınız
-              için arıyorum. Evinizi ücretsiz olarak sitemizde Türkçe, İngilizce, Rusça ve Almanca yayınlayıp yabancı ve yerli
-              alıcılara ulaştırabiliriz; size ayrıca bölge fiyat analizi gönderebiliriz. Kişisel verileriniz yalnız bu ilan için
-              işlenir; dilediğiniz an silinmesini isteyebilirsiniz. İlgilenir misiniz?"
-            </p>
+          <details open={gecmis.length === 0} class="rehber-adim">
+            <summary><strong>Arama rehberi</strong></summary>
+            {!siteAyar().hukuk_onayli && <p class="uyari kucuk">Yasal metinler avukat onayı bekliyor; KVKK cümlesi taslaktır.</p>}
+            {aramaRehberi(a as any, k.ad, siteAyar().unvan, SITE_ADI).map((adim) => (
+              <div class="adim">
+                <h4>{adim.baslik}</h4>
+                {adim.soyle && <p class="script">"{adim.soyle}"</p>}
+                <ul>{adim.maddeler.map((m) => <li>{m}</li>)}</ul>
+              </div>
+            ))}
+            {waNumara(a.telefon)
+              ? <a class="dugme ikincil" target="_blank" rel="noopener"
+                  href={`https://wa.me/${waNumara(a.telefon)}?text=${encodeURIComponent(takipMesaji(a as any, k.ad, SITE_ADI, istek().kok))}`}>WhatsApp'tan bilgi gönder ↗</a>
+              : <p class="kucuk">WhatsApp için geçerli telefon yok.</p>}
           </details>
           <h3>Arama sonucu</h3>
           <form method="post" action={`/admin/aday/${a.id}/arama`} class="form" data-arama-formu>
@@ -346,6 +365,11 @@ admin.get("/aday/:id", async (c) => {
             ))}
             {gecmis.length === 0 && <li class="kucuk">Henüz arama yok.</li>}
           </ul>
+          {(a.telefon || a.sahip_adi || a.notlar) && (
+            <form method="post" action={`/admin/aday/${a.id}/veri-sil`} onsubmit="return confirm('Sahibin adı, telefonu ve tüm notlar kalıcı olarak silinecek. Emin misiniz?')">
+              <button class="metin-dugme">Kişisel veriyi şimdi sil (sahip istedi)</button>
+            </form>
+          )}
         </section>
       </div>
     </AdminSayfa>,
