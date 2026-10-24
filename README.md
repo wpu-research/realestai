@@ -45,3 +45,14 @@ yetki sözleşmesi ve rıza ister (`db/schema.sql`, `yayin` tablosu).
 ```bash
 python3 -m pytest -q
 ```
+
+Web uygulaması (`web/`): `npm install`, `npm test`, `npx tsx src/server.tsx` (`DATABASE_URL` gerekli).
+
+## Canlı ortam (Railway)
+
+- Proje `realestai`, servis `web` (kök `/web`, Dockerfile) ve `Postgres`. Deploy: `cd web && railway up --service web --detach`.
+- Kalıcı dosyalar: `web-volume` → `/data` (`UPLOAD_DIZIN=/data/uploads`: ilan fotoğrafları, sözleşmeler, rıza belgeleri, ses önbelleği).
+- Yedek: iki volume'da da Railway yedekleri açık — günlük (6 gün saklanır) ve haftalık (27 gün).
+  Geri yükleme: Railway → servis → Volume → Backups → Restore. Önemli bir işlemden önce aynı yerden elle yedek alın.
+- Anahtarlar Railway Variables'ta: `ANTHROPIC_API_KEY`, `NVIDIA_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_SES_ID`.
+- Geçici adres (`*.up.railway.app`) arama motorlarına kapalıdır (`robots.txt`); alan adı bağlanınca açılır.
