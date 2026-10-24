@@ -11,6 +11,7 @@ import { SITE_ADI, UPLOAD_DIZIN } from "../config.js";
 import { sql } from "../db.js";
 import { csvOku } from "../lib/csv.js";
 import { radarPuanla } from "../lib/radar.js";
+import { anahtarUret, eklentiPaketi } from "./eklenti.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_ANAHTARLARI, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 import {
   ADAY_DURUM_ETIKET, BAYRAK_ETIKET, fiyatMetni, ODA_ETIKET, para, tarih, TIP_ETIKET, TUR_ETIKET, yuzde,
@@ -69,6 +70,7 @@ function AdminSayfa({ baslik, children, menu = true, kullanici, scriptler = [] }
               <a href="/admin/basvurular">Başvurular</a>
               <a href="/admin/talepler">Talepler</a>
               <a href="/admin/olcum">Ölçüm</a>
+              <a href="/admin/eklenti">Radar eklentisi</a>
               {kullanici?.rol === "admin" && <a href="/admin/kullanicilar">Kullanıcılar</a>}
             </nav>
             <form method="post" action="/admin/cikis" class="cikis"><span>{kullanici?.ad}</span><button>Çıkış</button></form>
@@ -913,4 +915,72 @@ admin.post("/kullanici/:id/aktif", async (c) => {
   await sql`update kullanicilar set aktif = not aktif where id = ${c.req.param("id")}`;
   await sql`delete from oturumlar where kullanici_id = ${c.req.param("id")}`;
   return c.redirect("/admin/kullanicilar");
+});
+
+// ================= RADAR EKLENTİSİ =================
+admin.get("/eklenti", async (c) => {
+  const k = c.get("kullanici");
+  const anahtarlar = await sql`select a.id, a.ad, a.son_kullanim, a.created_at, u.ad as kullanici from eklenti_anahtarlari a
+    join kullanicilar u on u.id = a.kullanici_id where a.iptal_at is null ${k.rol === "admin" ? sql`` : sql`and a.kullanici_id = ${k.id}`}
+    order by a.created_at desc`;
+  return c.html(
+    <AdminSayfa baslik="Radar eklentisi" kullanici={k}>
+      <h1>Radar eklentisi</h1>
+      <p>Chrome eklentisi, açık olan ilanı tek tıkla aday listesine ekler ve hemen puanlar. Sahibinden, Hepsiemlak,
+        Emlakjet sayfalarında alanları kendisi doldurur; Facebook gibi yerlerde paylaşım metnini seçip eklentiye tıklayın.</p>
+      <div class="kutu-panel">
+        <h2>Kurulum</h2>
+        <ol>
+          <li><a href="/admin/eklenti/indir" class="dugme">Eklentiyi indir (.zip)</a> ve bir klasöre açın.</li>
+          <li>Chrome'da <code>chrome://extensions</code> adresine gidin, sağ üstten <b>Geliştirici modu</b>nu açın.</li>
+          <li><b>Paketlenmemiş öğe yükle</b> ile açtığınız <code>realestai-radar</code> klasörünü seçin.</li>
+          <li>Aşağıdan kendinize bir anahtar oluşturun, eklentiye tıklayıp yapıştırın.</li>
+        </ol>
+        <p class="kucuk">Kurallar: yalnız tek tek, elle; toplu kopyalama ve otomatik tarama yok. Fotoğraf alınmaz.
+          İlan metni yalnız sahip tespiti için saklanır, sitede yayınlanmaz.</p>
+      </div>
+      <h2>Anahtarlar</h2>
+      <div class="tablo-kap">
+        <table class="tablo">
+          <thead><tr><th>Ad</th>{k.rol === "admin" && <th>Kullanıcı</th>}<th>Oluşturuldu</th><th>Son kullanım</th><th></th></tr></thead>
+          <tbody>{anahtarlar.map((a) => (
+            <tr><td>{a.ad}</td>{k.rol === "admin" && <td>{a.kullanici}</td>}<td>{tarih(a.created_at)}</td><td>{a.son_kullanim ? tarih(a.son_kullanim) : "—"}</td>
+              <td><form method="post" action={`/admin/eklenti/${a.id}/iptal`}><button class="metin-dugme">İptal et</button></form></td></tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <form method="post" action="/admin/eklenti" class="satir-form" style="margin-top:12px">
+        <input name="ad" placeholder="Anahtar adı (ör. Didem dizüstü)" required maxlength={60} />
+        <button class="dugme">Anahtar oluştur</button>
+      </form>
+    </AdminSayfa>,
+  );
+});
+admin.post("/eklenti", async (c) => {
+  const b = await c.req.parseBody();
+  const anahtar = await anahtarUret(c.get("kullanici").id, (s(b, "ad") ?? "eklenti").slice(0, 60));
+  // Anahtar yalnız bu yanıtta gösterilir (adres çubuğunda ya da geçmişte kalmasın diye yönlendirme yok).
+  return c.html(
+    <AdminSayfa baslik="Yeni anahtar" kullanici={c.get("kullanici")}>
+      <a href="/admin/eklenti" class="geri">← Radar eklentisi</a>
+      <h1>Yeni anahtar</h1>
+      <div class="kutu-panel gerekce">
+        <strong>Yalnız şimdi görünür — kopyalayıp eklentiye yapıştırın:</strong>
+        <p><code>{anahtar}</code></p>
+      </div>
+    </AdminSayfa>,
+  );
+});
+admin.post("/eklenti/:id/iptal", async (c) => {
+  const k = c.get("kullanici");
+  await sql`update eklenti_anahtarlari set iptal_at = now() where id = ${c.req.param("id")}
+    ${k.rol === "admin" ? sql`` : sql`and kullanici_id = ${k.id}`}`;
+  return c.redirect("/admin/eklenti");
+});
+admin.get("/eklenti/indir", async (c) => {
+  const proto = c.req.header("x-forwarded-proto") ?? new URL(c.req.url).protocol.replace(":", "");
+  const paket = await eklentiPaketi(`${proto}://${c.req.header("host")}`);
+  return c.body(new Uint8Array(paket), 200, {
+    "Content-Type": "application/zip", "Content-Disposition": 'attachment; filename="realestai-radar.zip"',
+  });
 });

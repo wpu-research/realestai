@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+  <script src="topla.js"></script>
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+  <header><strong>RealEstAi</strong> Radar <span id="kim"></span></header>
+
+  <section id="kurulum" hidden>
+    <p>Panelde <b>Radar eklentisi</b> sayfasından aldığınız anahtarı girin.</p>
+    <label>Sunucu<input id="sunucu" type="url" placeholder="https://…" /></label>
+    <label>Anahtar<input id="anahtar" placeholder="rea_…" autocomplete="off" /></label>
+    <button id="kaydet-ayar">Bağlan</button>
+    <p class="hata" id="kurulum-hata"></p>
+  </section>
+
+  <section id="ana" hidden>
+    <p class="uyari" id="durum"></p>
+    <form id="form">
+      <label>Başlık<input name="baslik" required /></label>
+      <div class="iki">
+        <label>Tip<select name="tip" required>
+          <option value="">—</option><option value="satilik">Satılık</option><option value="kiralik">Kiralık</option>
+          <option value="sezonluk">Sezonluk</option><option value="gunluk">Günlük</option></select></label>
+        <label>Tür<select name="emlak_turu">
+          <option value="">—</option><option value="daire">Daire</option><option value="villa">Villa</option>
+          <option value="mustakil">Müstakil</option><option value="rezidans">Rezidans</option>
+          <option value="arsa">Arsa</option><option value="diger">Diğer</option></select></label>
+      </div>
+      <label>Mahalle<select name="mahalle_id"><option value="">— bulunamadı —</option></select></label>
+      <div class="iki">
+        <label>Fiyat<input name="fiyat" inputmode="decimal" /></label>
+        <label>Para<select name="para_birimi"><option>TRY</option><option>EUR</option><option>USD</option><option>GBP</option></select></label>
+      </div>
+      <div class="iki">
+        <label>Fiyat birimi<select name="fiyat_birimi">
+          <option value="toplam">toplam</option><option value="aylik">aylık</option><option value="sezon">sezon</option>
+          <option value="gecelik">gecelik</option><option value="haftalik">haftalık</option></select></label>
+        <label>Oda<input name="oda" placeholder="2+1" /></label>
+      </div>
+      <div class="iki">
+        <label>Net m²<input name="net_m2" inputmode="decimal" /></label>
+        <label>Kapasite (kişi)<input name="yatak_kapasitesi" inputmode="numeric" /></label>
+      </div>
+      <div class="iki">
+        <label>İlan veren<select name="ilan_veren">
+          <option value="">bilinmiyor</option><option value="sahibinden">sahibinden</option><option value="emlakci">emlakçı</option></select></label>
+        <label>Yayında (gün)<input name="yayinda_gun" inputmode="numeric" /></label>
+      </div>
+      <div class="iki">
+        <label>Sahip adı<input name="sahip_adi" /></label>
+        <label>Telefon<input name="telefon" type="tel" placeholder="ilanda görünüyorsa" /></label>
+      </div>
+      <details><summary>İlan metni ve not</summary>
+        <label>İlan metni (sahip tespiti için, yayınlanmaz)<textarea name="aciklama" rows="5"></textarea></label>
+        <label>Not<textarea name="notlar" rows="2"></textarea></label>
+      </details>
+      <input type="hidden" name="kaynak" /><input type="hidden" name="kaynak_url" /><input type="hidden" name="kaynak_ilan_no" />
+      <div class="eylem">
+        <button type="button" id="claude" class="ikincil" title="Metinden alanları Claude ile doldurur">✨ Claude ile doldur</button>
+        <button id="gonder">Adaylara ekle</button>
+      </div>
+    </form>
+    <div id="sonuc" hidden></div>
+    <p class="kucuk">Yalnız açık olan tek ilan, sizin tıklamanızla alınır; fotoğraf alınmaz. <a href="#" id="ayar-ac">Ayarlar</a></p>
+  </section>
+</body>
+</html>

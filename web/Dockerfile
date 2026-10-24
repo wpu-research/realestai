@@ -15,6 +15,7 @@ COPY package.json ./
 COPY public ./public
 COPY db ./db
 COPY data ./data
+COPY eklenti ./eklenti
 # Railway volume /data'ya bağlanır; ilan fotoğrafları ve sözleşmeler orada kalıcıdır.
 ENV UPLOAD_DIZIN=/data/uploads
 EXPOSE 3000

@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "RealEstAi Radar",
+  "version": "0.1.0",
+  "description": "Açık olan ilanı tek tıkla RealEstAi aday listesine ekler (ekip içi).",
+  "action": { "default_popup": "popup.html", "default_title": "Adaylara ekle" },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "icons": { "32": "ikon-32.png", "128": "ikon-128.png" }
+}

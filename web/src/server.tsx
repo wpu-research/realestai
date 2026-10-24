@@ -15,6 +15,7 @@ import { admin } from "./routes/admin.js";
 import { api } from "./routes/api.js";
 import { ara } from "./routes/ara.js";
 import { araclar } from "./routes/araclar.js";
+import { eklenti } from "./routes/eklenti.js";
 import { site } from "./routes/site.js";
 import { Sayfa } from "./views/layout.js";
 
@@ -54,6 +55,7 @@ app.use("/uploads/ilan/*", serveStatic({
 }));
 
 app.route("/api", api);
+app.route("/eklenti-api", eklenti);
 app.route("/ara", ara);
 app.route("/", araclar);
 app.route("/admin", admin);

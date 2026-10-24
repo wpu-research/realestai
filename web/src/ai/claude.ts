@@ -232,3 +232,40 @@ Kırmızı bayraklar: metinde AÇIKÇA geçen durumları işaretle, tahmin yür�
   if (!sonuc) throw new Error("çeviri tamamlanamadı");
   return sonuc;
 }
+
+// ---------- Radar eklentisi: ilan metninden aday alanları ----------
+
+export type AyiklananAlanlar = {
+  tip: string | null; emlak_turu: string | null; oda: string | null; net_m2: number | null; yatak_kapasitesi: number | null;
+  fiyat: number | null; para_birimi: string | null; fiyat_birimi: string | null; ilan_veren: string | null;
+  mahalle: string | null; sahip_adi: string | null;
+};
+export async function ilanAyikla(baslik: string, metin: string, url: string): Promise<AyiklananAlanlar | null> {
+  const bos = (tur: string, ek: Record<string, unknown> = {}) => ({ anyOf: [{ type: tur, ...ek }, { type: "null" }] });
+  return jsonIste<AyiklananAlanlar>(
+    `Bodrum'da bir emlak ekibinin radar asistanısın. Bir ilan sayfasından ya da sosyal medya paylaşımından
+alınmış metinden ilan bilgilerini çıkar. Yalnız metinde AÇIKÇA yazanı yaz; emin değilsen null.
+- fiyat: sayı (4,5 milyon → 4500000). para_birimi: TRY, EUR, USD, GBP.
+- fiyat_birimi: satılıkta toplam; kiralıkta aylik; sezonlukta sezon; günlükte gecelik ya da haftalik.
+- ilan_veren: metin "sahibinden" diyorsa ya da kişi kendi evini anlatıyorsa sahibinden; ofis, portföy,
+  danışman ifadeleri varsa emlakci; belirsizse null.
+- mahalle: listedeki slug'lardan biri ya da null.
+Mahalleler:
+${await mahalleler()}`,
+    [{ role: "user", content: `ADRES: ${url}\nBAŞLIK: ${baslik}\nMETİN:\n${metin}` }],
+    {
+      type: "object", additionalProperties: false,
+      properties: {
+        tip: bos("string", { enum: ["satilik", "kiralik", "sezonluk", "gunluk"] }),
+        emlak_turu: bos("string", { enum: ["daire", "villa", "mustakil", "rezidans", "arsa", "diger"] }),
+        oda: bos("string"), net_m2: bos("number"), yatak_kapasitesi: bos("integer"),
+        fiyat: bos("number"), para_birimi: bos("string", { enum: ["TRY", "EUR", "USD", "GBP"] }),
+        fiyat_birimi: bos("string", { enum: ["toplam", "aylik", "sezon", "gecelik", "haftalik"] }),
+        ilan_veren: bos("string", { enum: ["sahibinden", "emlakci"] }),
+        mahalle: bos("string"), sahip_adi: bos("string"),
+      },
+      required: ["tip", "emlak_turu", "oda", "net_m2", "yatak_kapasitesi", "fiyat", "para_birimi", "fiyat_birimi",
+        "ilan_veren", "mahalle", "sahip_adi"],
+    },
+  );
+}
