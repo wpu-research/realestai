@@ -1,10 +1,11 @@
 import { demoKosulu } from "../lib/site-ayar.js";
 import { Hono } from "hono";
-import { dil, t } from "../lib/dil.js";
+import { dil, SES_DILI, t } from "../lib/dil.js";
 import { sql } from "../db.js";
 import { KUR } from "../lib/arama.js";
 import { para } from "../lib/bicim.js";
-import { Sayfa } from "../views/layout.js";
+import { ESKI_GUN, gunOnce, krediOranlari } from "../lib/kredi-oran.js";
+import { json, Sayfa } from "../views/layout.js";
 
 // Emlak endeksi, kredi hesaplama, bana emlakçı bul, rehberler ve kaydedilenler.
 export const araclar = new Hono();
@@ -99,8 +100,11 @@ araclar.get("/endeks", async (c) => {
 });
 
 // ---------- Kredi hesapla ----------
-araclar.get("/kredi", (c) =>
-  c.html(
+araclar.get("/kredi", async (c) => {
+  const k = await krediOranlari();
+  const yas = gunOnce(k.guncelleme);
+  const goster = k.oranlar.length > 0 && yas != null && yas <= ESKI_GUN;
+  return c.html(
     <Sayfa baslik={t("Konut kredisi hesapla")} scriptler={["/js/kredi.js"]}>
       <div class="kap bolum">
         <span class="ust-etiket">{t("Kredi")}</span>
@@ -127,13 +131,27 @@ araclar.get("/kredi", (c) =>
             <details class="odeme-plani"><summary>{t("Ödeme planı (ilk 12 ay)")}</summary><div data-plan></div></details>
           </div>
         </div>
+        {goster && (
+          <section class="kart-kutu banka-oranlari">
+            <h2>{t("Bankaların konut kredisi oranları")}</h2>
+            <p class="kucuk">
+              {t("Ekibimizin {tarih} tarihinde bankaların sitelerinden derlediği ilan edilen oranlardır; size verilecek oran gelirinize ve bankayla ilişkinize göre değişebilir.", { tarih: new Date(k.guncelleme!).toLocaleDateString(SES_DILI[dil()], { timeZone: "Europe/Istanbul" }) })}
+            </p>
+            <script id="kredi-oranlar" type="application/json">{json(k.oranlar)}</script>
+            <div class="tablo-kaydir"><table class="plan banka-tablo" data-bankalar>
+              <thead><tr><th>{t("Banka")}</th><th>{t("Aylık faiz")}</th><th>{t("Aylık taksit")}</th><th>{t("Toplam maliyet")}</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table></div>
+            <p class="kucuk">{t("Toplam maliyet: taksitlerin toplamı ve kredi tahsis ücreti. Bir satıra dokunursanız o oran hesaplayıcıya yazılır.")}</p>
+          </section>
+        )}
         <div class="bilgi">
           {t("Hesaplama eşit taksitli kredi formülüyle yapılır ve bilgi amaçlıdır. Bireysel konut kredilerinde KKDF ve BSMV genellikle uygulanmaz; ekspertiz ücreti, konut ve DASK sigortası, tapu masrafları ayrıca ödenir. Bankaların kullandırabileceği kredi/değer oranı düzenlemelerle değişir; kesin teklif için bankanızla görüşün.")}
         </div>
       </div>
     </Sayfa>,
-  ),
-);
+  );
+});
 
 // ---------- Bana emlakçı bul ----------
 araclar.get("/emlakci-bul", (c) => {

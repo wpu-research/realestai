@@ -16,6 +16,7 @@ import {
   AVATAR_DIZIN, avatarAyar, avatarAyarKaydet, klonSesAcik, rizaGecerli, rizayiGeriAl, SesHatasi, sesAnahtarlariVar, sesUret,
 } from "../lib/avatar.js";
 import { KAYIT_BOLUMLERI, KAYIT_KURALLARI } from "../lib/kayit-metni.js";
+import { ESKI_GUN, gunOnce, krediOranlari, krediOranlariKaydet, oranlariAyikla, type KrediOranlari } from "../lib/kredi-oran.js";
 import { SIRKET_ZORUNLU, siteAyar, siteAyarKaydet, type SiteAyar } from "../lib/site-ayar.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_ANAHTARLARI, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 import {
@@ -76,6 +77,7 @@ function AdminSayfa({ baslik, children, menu = true, kullanici, scriptler = [] }
               <a href="/admin/talepler">Talepler</a>
               <a href="/admin/olcum">Ölçüm</a>
               <a href="/admin/eklenti">Radar eklentisi</a>
+              <a href="/admin/kredi">Kredi oranları</a>
               {kullanici?.rol === "admin" && <a href="/admin/avatar">Avatar</a>}
               {kullanici?.rol === "admin" && <a href="/admin/yayin">Yayına hazırlık</a>}
               {kullanici?.rol === "admin" && <a href="/admin/kullanicilar">Kullanıcılar</a>}
@@ -1255,6 +1257,7 @@ admin.get("/yayin", async (c) => {
     sql`select count(*)::int as anahtar from eklenti_anahtarlari where iptal_at is null`,
     avatarAyar(),
   ]);
+  const krediYas = gunOnce((await krediOranlari()).guncelleme);
   const host = c.req.header("host") ?? "";
   const eksikSirket = SIRKET_ZORUNLU.filter((k) => !a[k]);
   const kritik: [boolean, string][] = [
@@ -1269,6 +1272,8 @@ admin.get("/yayin", async (c) => {
     [!!process.env.NVIDIA_API_KEY, process.env.NVIDIA_API_KEY ? "NVIDIA bağlı (fotoğraf oda etiketi)" : "NVIDIA_API_KEY yok — fotoğraf etiketleri elle"],
     [klonSesAcik(avatar), klonSesAcik(avatar) ? "Didem'in klon sesi açık" : "Avatar: tarayıcı sesi (rıza ve ElevenLabs bekliyor)"],
     [anahtar > 0, `Radar eklentisi: ${anahtar} etkin anahtar`],
+    [krediYas != null && krediYas <= ESKI_GUN, krediYas == null ? "Kredi oranları girilmedi (kredi sayfasında banka karşılaştırması yok)"
+      : krediYas > ESKI_GUN ? `Kredi oranları ${krediYas} gün önce güncellendi; eskidiği için sitede gizli` : `Kredi oranları ${krediYas} gün önce güncellendi`],
   ];
   const satir = ([tamam, metin]: [boolean, string]) => <li class={tamam ? "tamam" : "eksik"}>{tamam ? "✓" : "✗"} {metin}</li>;
   return c.html(
@@ -1310,4 +1315,68 @@ admin.post("/yayin", async (c) => {
   for (const k of ["instagram", "facebook"] as const) if (yeni[k] && !/^https:\/\//.test(yeni[k]!)) yeni[k] = "";
   await siteAyarKaydet(yeni);
   return c.redirect("/admin/yayin?ok=1");
+});
+
+
+// ================= KREDİ ORANLARI (tüm ekip) =================
+// Bankaların sitelerinde ilan edilen konut kredisi oranları elle girilir; /kredi sayfasında karşılaştırılır.
+type KrediSatir = { banka: string; faiz: string; tahsis: string; vade: string };
+function krediSayfasi(c: any, k: KrediOranlari, satirlar: (KrediSatir | null)[], kaynak: string, hata = "") {
+  const yas = gunOnce(k.guncelleme);
+  satirlar = [...satirlar, ...Array.from({ length: 3 }, () => null)];
+  return c.html(
+    <AdminSayfa baslik="Kredi oranları" kullanici={c.get("kullanici")}>
+      <h1>Kredi oranları</h1>
+      {c.req.query("ok") && <div class="basari">Kaydedildi; kredi sayfasında görünüyor.</div>}
+      {hata && <div class="hata">{hata}</div>}
+      <div class="kutu-panel">
+        <p>
+          {yas == null ? "Henüz oran girilmedi." : `Son güncelleme: ${new Date(k.guncelleme!).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })} (${yas} gün önce).`}
+          {" "}Oranlar {ESKI_GUN} günden eski olursa yanıltmasın diye sitede otomatik gizlenir; ayda bir bakıp kaydedin.
+        </p>
+        <p class="kucuk">
+          Bankaların sitelerindeki "konut kredisi" sayfasından aylık faizi, kredi tahsis ücretini (yasal üst sınır kredinin binde 5'i) ve
+          azami vadeyi yazın. Kampanya oranı belirli koşullara bağlıysa (maaş müşterisi, enerji sınıfı vb.) kısa notu kaynak alanına ekleyin.
+          Değişiklik olmasa da "Kaydet" güncelleme tarihini yeniler.
+        </p>
+      </div>
+      <form method="post" action="/admin/kredi" class="kutu-panel form">
+        <div class="tablo-kap"><table class="tablo">
+          <thead><tr><th>Banka</th><th>Aylık faiz (%)</th><th>Tahsis ücreti (%)</th><th>Azami vade (ay)</th></tr></thead>
+          <tbody>
+            {satirlar.map((o) => (
+              <tr>
+                <td><input name="banka" value={o?.banka ?? ""} placeholder="Banka adı" /></td>
+                <td><input name="faiz" inputmode="decimal" value={o?.faiz ?? ""} placeholder="2,79" /></td>
+                <td><input name="tahsis" inputmode="decimal" value={o?.tahsis ?? ""} placeholder="0,5" /></td>
+                <td><input name="vade" inputmode="numeric" value={o?.vade ?? ""} placeholder="120" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <p class="kucuk">Bir bankayı kaldırmak için adını silin. Daha fazla satır için kaydedin; 3 boş satır yeniden eklenir.</p>
+        <label>Kaynak / not (sitede gösterilmez)<input name="kaynak" value={kaynak} placeholder="ör. bankaların web siteleri; 2,79 oranı yalnız maaş müşterisine" /></label>
+        <button class="dugme">Kaydet</button>
+        <a href="/kredi" target="_blank" class="kucuk"> Kredi sayfasını aç ↗</a>
+      </form>
+    </AdminSayfa>,
+  );
+}
+admin.get("/kredi", async (c) => {
+  const k = await krediOranlari();
+  const satirlar = k.oranlar.map((o) => ({ banka: o.banka, faiz: String(o.faiz), tahsis: String(o.tahsis), vade: String(o.azami_vade) }));
+  return krediSayfasi(c, k, satirlar, k.kaynak);
+});
+admin.post("/kredi", async (c) => {
+  const b = await c.req.parseBody({ all: true });
+  const dizi = (k: string) => ([] as unknown[]).concat(b[k] ?? []).map((x) => (typeof x === "string" ? x : ""));
+  const { oranlar, hatalar } = oranlariAyikla(dizi("banka"), dizi("faiz"), dizi("tahsis"), dizi("vade"));
+  if (hatalar.length) {
+    // Yazılanlar kaybolmasın: form girilen değerlerle hatayla birlikte yeniden çizilir.
+    const girilen = dizi("banka").map((banka, i) => ({ banka, faiz: dizi("faiz")[i] ?? "", tahsis: dizi("tahsis")[i] ?? "", vade: dizi("vade")[i] ?? "" }))
+      .filter((r) => r.banka.trim());
+    return krediSayfasi(c, await krediOranlari(), girilen, s(b, "kaynak") ?? "", hatalar.join("; "));
+  }
+  await krediOranlariKaydet({ oranlar, guncelleme: oranlar.length ? new Date().toISOString() : null, kaynak: (s(b, "kaynak") ?? "").slice(0, 500) });
+  return c.redirect("/admin/kredi?ok=1");
 });

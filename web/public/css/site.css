@@ -461,6 +461,15 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
 .plan { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 10px; }
 .plan th, .plan td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--border); }
 .plan th:first-child, .plan td:first-child { text-align: left; }
+.banka-oranlari { margin-top: 24px; }
+.banka-oranlari h2 { font-size: 1.3rem; margin: 0 0 4px; }
+.tablo-kaydir { overflow-x: auto; }
+.banka-tablo { font-size: .9rem; }
+.banka-tablo th, .banka-tablo td { padding: 10px 6px; white-space: nowrap; }
+.banka-tablo tbody tr { cursor: pointer; }
+.banka-tablo tbody tr:hover { background: var(--muted); }
+.banka-tablo tr.secili { background: color-mix(in srgb, var(--primary) 10%, transparent); font-weight: 600; }
+.banka-tablo tr.pasif { color: var(--muted-foreground); }
 .rehber h2 { margin-top: 32px; font-size: 1.4rem; }
 .rehber ul { padding-left: 20px; line-height: 1.7; }
 .rehber-alt { margin-top: 24px; font-size: .92rem; }
@@ -476,6 +485,9 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
 }
 @media (max-width: 767px) {
   .arac-izgara { grid-template-columns: 1fr; }
+  .banka-tablo { font-size: .8rem; }
+  .banka-tablo th, .banka-tablo td { padding: 8px 3px; white-space: normal; }
+  .banka-tablo th:last-child, .banka-tablo td:last-child { display: none; }
   .ozellik-grup ul { grid-template-columns: 1fr 1fr; }
   .sesli-arama-dugme span { display: none; }
   .sesli-arama-dugme { width: 44px; padding: 0; justify-content: center; }

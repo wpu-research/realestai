@@ -1,6 +1,8 @@
 // Tarayıcı betiklerinde t() ile çevrilen metinler; sayfaya seçili dilde gömülür.
 export const ISTEMCI_METINLERI: string[] = [
   "Anapara",
+  "En fazla {n} ay",
+  "Kullan",
   "Anlıyorum…",
   "Arama kaydedildi",
   "Aramam",
