@@ -16,7 +16,7 @@ const tlCarpani = sql`case para_birimi when 'EUR' then ${KUR.EUR}::numeric when 
 // ---------- Kaydedilenler (tarayıcıda tutulur; sayfa istemcide çizilir) ----------
 araclar.get("/kaydedilenler", (c) =>
   c.html(
-    <Sayfa baslik={t("Kaydedilenler")} scriptler={["/js/kaydedilenler.js"]}>
+    <Sayfa baslik={t("Kaydedilenler")} scriptler={["/js/kaydedilenler.js"]} noindex>
       <div class="kap bolum">
         <h1>{t("Kaydedilenler")}</h1>
         <p class="alt-baslik">{t("Kaydettiğiniz ilanlar ve aramalar bu cihazda saklanır.")}</p>
@@ -296,7 +296,7 @@ araclar.post("/ekspertiz", async (c) => {
 });
 
 // ---------- Rehberler ----------
-const REHBER: Record<string, { baslik: string; ust: string; giris: string; bolumler: { id?: string; baslik: string; maddeler: string[] }[] }> = {
+export const REHBER: Record<string, { baslik: string; ust: string; giris: string; bolumler: { id?: string; baslik: string; maddeler: string[] }[] }> = {
   alirken: {
     ust: "Alırken", baslik: "Ev alırken: ekspertiz ve alım rehberi",
     giris: "Bodrum'da ev alırken adım adım neye bakmanız gerektiği, ekspertizin ne işe yaradığı ve masraflar.",

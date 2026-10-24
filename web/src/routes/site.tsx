@@ -3,7 +3,7 @@ import { demoKosulu, siteAyar, yerTutucu } from "../lib/site-ayar.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AVATAR_DIZIN, avatarAyar, fotoGosterilir, imzala, klonSesAcik } from "../lib/avatar.js";
-import { dil, t } from "../lib/dil.js";
+import { dil, istek, t } from "../lib/dil.js";
 import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
@@ -142,8 +142,22 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
     ["Sezon", i.sezon_baslangic ? `${new Date(i.sezon_baslangic).toLocaleDateString(dil())} – ${new Date(i.sezon_bitis).toLocaleDateString(dil())}` : null],
   ];
 
+  // schema.org: arama sonuçlarında fiyat ve konumla görünsün. DEMO ilanlar dizinlenmez.
+  const { kok } = istek();
+  const jsonld = {
+    "@context": "https://schema.org", "@type": "RealEstateListing",
+    name: metin.baslik, description: metin.aciklama.slice(0, 500), url: kok + `/ilan/${no}`,
+    image: fotolar.slice(0, 6).map((f) => (f.url.startsWith("http") ? f.url : kok + f.url)),
+    datePosted: i.yayinlandi_at ? new Date(i.yayinlandi_at).toISOString().slice(0, 10) : undefined,
+    offers: {
+      "@type": "Offer", price: Number(i.fiyat), priceCurrency: i.para_birimi,
+      businessFunction: i.tip === "satilik" ? "http://purl.org/goodrelations/v1#Sell" : "http://purl.org/goodrelations/v1#LeaseOut",
+    },
+    contentLocation: { "@type": "Place", address: { "@type": "PostalAddress", addressLocality: i.mahalle, addressRegion: i.ilce, addressCountry: "TR" } },
+  };
   return c.html(
-    <Sayfa baslik={metin.baslik} aciklama={metin.aciklama.slice(0, 155)} harita scriptler={["/js/ilan.js", "/js/form.js"]}>
+    <Sayfa baslik={metin.baslik} aciklama={metin.aciklama.slice(0, 155)} harita scriptler={["/js/ilan.js", "/js/form.js"]}
+      resim={fotolar[0]?.url} noindex={i.demo} jsonld={i.demo ? undefined : jsonld}>
       <div class="kap ilan">
         <div class="rozet-satir">
           <span class="rozet rozet-tip">{t(TIP_ETIKET[i.tip])}</span>
@@ -432,7 +446,7 @@ site.get("/asistan", async (c) => {
 });
 
 // ---------- Yasal (taslak) ----------
-const YASAL: Record<string, [string, string]> = {
+export const YASAL: Record<string, [string, string]> = {
   kvkk: ["KVKK Aydınlatma Metni", "Veri sorumlusu: [ŞİRKET UNVANI]. Başvuru ve talep formlarında verdiğiniz ad, telefon ve e-posta bilgileri yalnız talebinizi yanıtlamak ve ilan hizmetini sunmak amacıyla işlenir; yurt içinde barındırma hizmeti sağlayıcılarına ve yazılı açık rızanızla yurt dışındaki hizmet sağlayıcılara aktarılabilir. Verileriniz amaç için gerekli süre boyunca saklanır. KVKK m.11 kapsamındaki haklarınız için [e-posta] adresine başvurabilirsiniz."],
   cerez: ["Çerez Politikası", "Bu site yalnız oturum için zorunlu çerez kullanır. Analitik veya reklam çerezi kullanılmaz."],
   "acik-riza": ["Açık Rıza Metni", "[ŞİRKET UNVANI] tarafından, talebimi yanıtlamak ve ilan hizmetinin sunulması amacıyla, yurt dışındaki hizmet sağlayıcılara aktarım dahil kişisel verilerimin işlenmesine açık rıza veriyorum. Rızamı dilediğim zaman [e-posta] adresine yazarak geri alabilirim."],

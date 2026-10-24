@@ -8,7 +8,7 @@ import { siteAyar } from "../lib/site-ayar.js";
 import { KUR, type IlanKart } from "../lib/arama.js";
 import { para, TIP_ETIKET } from "../lib/bicim.js";
 import { Alan, Kisi, Menu, Yatak } from "./ikon.js";
-import { dil, istemciCevirileri, SES_DILI, t } from "../lib/dil.js";
+import { dil, dilAdresi, DILLER, istek, istemciCevirileri, SES_DILI, t } from "../lib/dil.js";
 import { ISTEMCI_METINLERI } from "../lib/istemci-metinleri.js";
 
 type SayfaProps = {
@@ -17,19 +17,40 @@ type SayfaProps = {
   children: Child;
   harita?: boolean;
   scriptler?: string[];
+  resim?: string;        // paylaşım önizlemesi (göreli ya da tam adres)
+  noindex?: boolean;     // arama motorlarına kapalı sayfalar (DEMO ilan, kişisel sayfalar)
+  jsonld?: object;       // schema.org yapılandırılmış veri
 };
+const OG_YEREL = { tr: "tr_TR", en: "en_GB", ru: "ru_RU", de: "de_DE" } as const;
 
 const KALP = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z";
 
-export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: SayfaProps) {
+export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], resim, noindex, jsonld }: SayfaProps) {
   const a = siteAyar();
+  const { kok } = istek();
+  const tamBaslik = baslik ? `${baslik} · ${SITE_ADI}` : `${SITE_ADI} · ${t("Bodrum'da ev, sahibinden")}`;
+  const tamAciklama = aciklama ?? t("Bodrum ve çevresinde sahibinin yetki verdiği, doğrulanmış satılık, kiralık, sezonluk ve günlük evler.");
+  const ogResim = resim ? (resim.startsWith("http") ? resim : kok + resim) : null;
   return (
     <html lang={dil()} data-ses-dili={SES_DILI[dil()]}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{baslik ? `${baslik} · ${SITE_ADI}` : `${SITE_ADI} · ${t("Bodrum'da ev, sahibinden")}`}</title>
-        <meta name="description" content={aciklama ?? t("Bodrum ve çevresinde sahibinin yetki verdiği, doğrulanmış satılık, kiralık, sezonluk ve günlük evler.")} />
+        <title>{tamBaslik}</title>
+        <meta name="description" content={tamAciklama} />
+        {noindex && <meta name="robots" content="noindex" />}
+        <link rel="canonical" href={dilAdresi(dil())} />
+        {DILLER.map((d) => <link rel="alternate" hreflang={d} href={dilAdresi(d)} />)}
+        <link rel="alternate" hreflang="x-default" href={dilAdresi("tr")} />
+        <meta property="og:site_name" content={SITE_ADI} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={baslik ?? tamBaslik} />
+        <meta property="og:description" content={tamAciklama} />
+        <meta property="og:url" content={dilAdresi(dil())} />
+        <meta property="og:locale" content={OG_YEREL[dil()]} />
+        {ogResim && <meta property="og:image" content={ogResim} />}
+        <meta name="twitter:card" content={ogResim ? "summary_large_image" : "summary"} />
+        {jsonld && <script type="application/ld+json">{json(jsonld)}</script>}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />

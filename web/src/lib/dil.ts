@@ -6,9 +6,17 @@ import { CEVIRI } from "./ceviri.js";
 export const DILLER = ["tr", "en", "ru", "de"] as const;
 export type Dil = (typeof DILLER)[number];
 
-const depo = new AsyncLocalStorage<{ dil: Dil }>();
-export const dilIle = <T>(dil: Dil, fn: () => T) => depo.run({ dil }, fn);
+// kok: "https://alanadi.com"; yol: dil parametresi çıkarılmış adres (canonical ve hreflang için).
+type Istek = { dil: Dil; kok: string; yol: string };
+const depo = new AsyncLocalStorage<Istek>();
+export const dilIle = <T>(istek: Istek, fn: () => T) => depo.run(istek, fn);
 export const dil = (): Dil => depo.getStore()?.dil ?? "tr";
+export const istek = () => depo.getStore() ?? { dil: "tr" as Dil, kok: "", yol: "/" };
+// Bir sayfanın belirli dildeki adresi: Türkçe parametresiz, diğerleri ?dil=xx ile (arama motorları her dili ayrı görür).
+export function dilAdresi(d: Dil, yol = istek().yol, kok = istek().kok): string {
+  if (d === "tr") return kok + yol;
+  return `${kok}${yol}${yol.includes("?") ? "&" : "?"}dil=${d}`;
+}
 
 const SIRA: Record<Exclude<Dil, "tr">, 0 | 1 | 2> = { en: 0, ru: 1, de: 2 };
 

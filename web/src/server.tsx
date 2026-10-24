@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { ilkYonetici } from "./auth.js";
 import { getCookie, setCookie } from "hono/cookie";
 import { DILLER, dilIle, type Dil } from "./lib/dil.js";
+import { seo } from "./routes/seo.js";
 import { UPLOAD_DIZIN } from "./config.js";
 import { migrate, sql } from "./db.js";
 import { radarPuanla } from "./lib/radar.js";
@@ -27,19 +28,24 @@ await mkdir(UPLOAD_DIZIN, { recursive: true });
 const app = new Hono();
 
 app.use("*", secureHeaders({ crossOriginEmbedderPolicy: false, contentSecurityPolicy: undefined }));
-// Dil: ?dil=en ile seçilir (çereze yazılır ve parametresiz adrese dönülür), sonra çerezden okunur.
+// Dil: ?dil=en adresi o dilde açılır ve seçim çereze yazılır (sonraki sayfalar çerezden).
+// Her dilin ayrı adresi olduğu için arama motorları dört dili de dizinleyebilir.
 app.use("*", async (c, next) => {
   const istenen = c.req.query("dil");
+  const u = new URL(c.req.url);
+  let d: Dil;
   if (istenen && (DILLER as readonly string[]).includes(istenen)) {
-    setCookie(c, "dil", istenen, { path: "/", maxAge: 365 * 86400, sameSite: "Lax" });
-    const u = new URL(c.req.url);
-    u.searchParams.delete("dil");
-    return c.redirect(u.pathname + u.search);
+    d = istenen as Dil;
+    if (getCookie(c, "dil") !== d) setCookie(c, "dil", d, { path: "/", maxAge: 365 * 86400, sameSite: "Lax" });
+  } else {
+    const cerez = getCookie(c, "dil");
+    d = (DILLER as readonly string[]).includes(cerez ?? "") ? (cerez as Dil) : "tr";
   }
-  const cerez = getCookie(c, "dil");
-  const d = (DILLER as readonly string[]).includes(cerez ?? "") ? (cerez as Dil) : "tr";
+  u.searchParams.delete("dil");
+  const kok = `${c.req.header("x-forwarded-proto") ?? u.protocol.replace(":", "")}://${c.req.header("host") ?? u.host}`;
   // Admin paneli Türkçe kalır.
-  return dilIle(c.req.path.startsWith("/admin") ? "tr" : d, () => next());
+  await dilIle({ dil: c.req.path.startsWith("/admin") ? "tr" : d, kok, yol: u.pathname + u.search }, () => next());
+  c.header("Vary", "Cookie", { append: true });
 });
 app.get("/saglik", async (c) => {
   await sql`select 1`;
@@ -55,6 +61,7 @@ app.use("/uploads/ilan/*", serveStatic({
   rewriteRequestPath: (p) => p.replace(/^\/uploads/, ""),
 }));
 
+app.route("/", seo);
 app.route("/api", api);
 app.route("/eklenti-api", eklenti);
 app.route("/ara", ara);
