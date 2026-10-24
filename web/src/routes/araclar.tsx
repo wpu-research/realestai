@@ -25,6 +25,33 @@ araclar.get("/kaydedilenler", (c) =>
         <h2 class="bolum-ust">{t("Kayıtlı ilanlar")}</h2>
         <div class="kartlar uc-sutun" data-ilanlar></div>
         <div class="bos" data-bos hidden><p>{t("Henüz ilan kaydetmediniz. İlanlardaki ♡ simgesine dokunarak kaydedebilirsiniz.")}</p><a href="/ara" class="dugme ikincil">{t("İlanlara göz at")}</a></div>
+
+        <section class="kart-kutu aktarim" id="tasi">
+          <h2>{t("Başka cihaza taşı")}</h2>
+          <p class="kucuk">{t("Üyelik gerekmez. Bu cihazda bir kod oluşturun, diğer cihazda girin; kayıtlarınız oraya eklenir. Kod 24 saat geçerlidir ve yalnızca ilan numaralarını ve aramaları içerir.")}</p>
+          <div class="aktarim-izgara">
+            <div>
+              <h3>{t("Bu cihazdan gönder")}</h3>
+              <button type="button" class="dugme" data-kod-olustur>{t("Taşıma kodu oluştur")}</button>
+              <div data-kod-sonuc hidden>
+                <p class="aktarim-kod" data-kod></p>
+                <p class="kucuk">{t("Diğer cihazda bu sayfayı açıp kodu girin ya da bağlantıyı gönderin.")}</p>
+                <div class="aktarim-dugmeler">
+                  <button type="button" class="dugme ikincil" data-kopyala>{t("Bağlantıyı kopyala")}</button>
+                  <button type="button" class="dugme ikincil" data-paylas hidden>{t("Paylaş")}</button>
+                </div>
+              </div>
+            </div>
+            <form data-kod-gir>
+              <h3>{t("Başka cihazdan al")}</h3>
+              <div class="aktarim-gir">
+                <input name="kod" placeholder="ABCD-EFGH" autocomplete="off" autocapitalize="characters" spellcheck={false} maxlength={12} required aria-label={t("Taşıma kodu")} />
+                <button class="dugme">{t("Getir")}</button>
+              </div>
+            </form>
+          </div>
+          <p class="kucuk" data-aktarim-durum role="status"></p>
+        </section>
       </div>
     </Sayfa>,
   ),

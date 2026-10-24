@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { t } from "../lib/dil.js";
+import { aktarimAyikla, kodDuzelt, kodGoster, kodUret } from "../lib/aktarim.js";
 import { avatarAyar, imzala, imzaDogru, klonSesAcik, SesHatasi, sesUret } from "../lib/avatar.js";
 
 export const api = new Hono();
@@ -102,6 +103,26 @@ api.post("/favori", async (c) => {
             select id, greatest(${artis}, 0) from ilanlar where ilan_no = ${no!}
             on conflict (ilan_id) do update set adet = greatest(favori_sayaci.adet + ${artis}, 0)`;
   return c.json({ ok: true });
+});
+
+// Kaydedilenleri başka cihaza taşıma. Oluşturma ve sorgu ayrı sınırlı (kod tahminini de yavaşlatır).
+api.post("/aktarim", async (c) => {
+  if (sinirAsildi(`aktar-o:${ipAl(c.req.header.bind(c.req))}`, 10)) return c.json({ hata: t("Çok fazla istek; biraz sonra deneyin.") }, 429);
+  const veri = aktarimAyikla(await c.req.json().catch(() => null));
+  if (!veri) return c.json({ hata: t("Taşınacak kayıt yok.") }, 400);
+  for (let i = 0; i < 5; i++) {
+    const kod = kodUret();
+    const [r] = await sql`insert into aktarimlar (kod, veri) values (${kod}, ${sql.json(veri)}) on conflict do nothing returning son`;
+    if (r) return c.json({ kod: kodGoster(kod), son: r.son });
+  }
+  return c.json({ hata: "kod üretilemedi" }, 500);
+});
+api.get("/aktarim/:kod", async (c) => {
+  if (sinirAsildi(`aktar-s:${ipAl(c.req.header.bind(c.req))}`, 30)) return c.json({ hata: t("Çok fazla istek; biraz sonra deneyin.") }, 429);
+  const kod = kodDuzelt(c.req.param("kod"));
+  const [r] = kod ? await sql`update aktarimlar set kullanim = kullanim + 1 where kod = ${kod} and son > now() returning veri` : [];
+  if (!r) return c.json({ hata: t("Kod bulunamadı ya da süresi doldu.") }, 404);
+  return c.json(r.veri);
 });
 
 // Kaydedilenler sayfası için ilan kartları (HTML), ilan numarası sırasıyla.

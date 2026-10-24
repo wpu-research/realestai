@@ -81,6 +81,7 @@ await siteAyarYukle();
 // KVKK: ilana dönüşmeyen adayların kişisel verisini günde bir temizle.
 setInterval(() => sql`select adaylari_temizle()`.catch((e) => console.error("temizlik", e)), 24 * 3600_000);
 setInterval(() => sql`delete from oturumlar where bitis < now()`.catch(() => {}), 3600_000);
+setInterval(() => sql`delete from aktarimlar where son < now()`.catch(() => {}), 3600_000);
 // Radar puanları her gece (yeni gözlemlerle medyanlar değişir).
 setInterval(() => radarPuanla().catch((e) => console.error("radar", e)), 24 * 3600_000);
 

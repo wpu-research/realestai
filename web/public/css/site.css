@@ -461,6 +461,14 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
 .plan { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 10px; }
 .plan th, .plan td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--border); }
 .plan th:first-child, .plan td:first-child { text-align: left; }
+.aktarim { margin-top: 40px; }
+.aktarim h2 { margin: 0 0 4px; font-size: 1.3rem; }
+.aktarim h3 { font-size: 1rem; margin: 16px 0 8px; }
+.aktarim-izgara { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.aktarim-kod { font: 600 1.8rem/1.2 ui-monospace, monospace; letter-spacing: .12em; color: var(--primary); margin: 12px 0 4px; }
+.aktarim-dugmeler, .aktarim-gir { display: flex; gap: 8px; flex-wrap: wrap; }
+.aktarim-gir input { flex: 1; min-width: 0; text-transform: uppercase; font-family: ui-monospace, monospace; letter-spacing: .08em; }
+@media (max-width: 767px) { .aktarim-izgara { grid-template-columns: 1fr; gap: 8px; } }
 .banka-oranlari { margin-top: 24px; }
 .banka-oranlari h2 { font-size: 1.3rem; margin: 0 0 4px; }
 .tablo-kaydir { overflow-x: auto; }

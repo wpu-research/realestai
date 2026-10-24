@@ -1,6 +1,15 @@
 // Tarayıcı betiklerinde t() ile çevrilen metinler; sayfaya seçili dilde gömülür.
 export const ISTEMCI_METINLERI: string[] = [
   "Anapara",
+  "Taşınacak kayıt yok.",
+  "Kod oluşturulamadı.",
+  "Kopyalandı",
+  "Bağlantıyı kopyala",
+  "Kaydedilenler",
+  "Yükleniyor…",
+  "{ilan} ilan ve {arama} arama bu cihaza eklendi.",
+  "Bu kayıtların hepsi bu cihazda zaten var.",
+  "Kod bulunamadı ya da süresi doldu.",
   "En fazla {n} ay",
   "Kullan",
   "Anlıyorum…",

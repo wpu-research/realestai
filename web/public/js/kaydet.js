@@ -22,6 +22,18 @@ export function ilanKaydet(no, kaydet) {
   fetch("/api/favori", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ no, artis: kaydet ? 1 : -1 }) }).catch(() => {});
 }
 
+// Taşıma kodundan gelen kayıtlar mevcutlarla birleştirilir (hiçbiri silinmez). Eklenen sayıları döner.
+export function birlestir(veri) {
+  const ilanlar = oku(ILAN);
+  const yeniIlan = (veri.ilanlar ?? []).filter((no) => Number.isInteger(no) && !ilanlar.includes(no));
+  const aramaListe = oku(ARAMA);
+  const yeniArama = (veri.aramalar ?? []).filter((a) => typeof a?.url === "string" && /^\/(?![\/\\])/.test(a.url) && !aramaListe.some((x) => x.url === a.url));
+  yaz(ILAN, [...ilanlar, ...yeniIlan].slice(0, 200));
+  yaz(ARAMA, [...aramaListe, ...yeniArama].slice(0, 50));
+  kalpleriCiz();
+  return { ilan: yeniIlan.length, arama: yeniArama.length };
+}
+
 export function aramaSil(url) {
   yaz(ARAMA, oku(ARAMA).filter((a) => a.url !== url));
 }
