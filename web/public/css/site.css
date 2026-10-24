@@ -201,7 +201,7 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
   border-radius: 16px; padding: 22px 20px; display: flex; flex-direction: column; gap: 20px; }
 .panel-bas { display: flex; justify-content: space-between; align-items: center; }
 .panel-bas button { display: none; background: none; border: 0; font-size: 1.1rem; cursor: pointer; color: var(--foreground); }
-.filtre-grup h4 { margin: 0 0 8px; font: 500 .95rem var(--sans); }
+.filtre-grup h3 { margin: 0 0 8px; font: 500 .95rem var(--sans); }
 .filtre-grup.kutular { display: flex; flex-direction: column; gap: 10px; }
 .cipler { display: flex; flex-wrap: wrap; gap: 8px; }
 .filtre-cip { display: inline-flex; flex-direction: row; cursor: pointer; border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: .8rem; font-weight: 400;
@@ -365,7 +365,7 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
 .filtre-bolum summary::after { content: "+"; font-size: 1.2rem; color: var(--muted-foreground); font-weight: 400; }
 .filtre-bolum[open] summary::after { content: "–"; }
 .filtre-bolum-ic { display: flex; flex-direction: column; gap: 10px; padding-bottom: 16px; }
-.filtre-bolum-ic h4 { margin: 6px 0 0; font: 500 .85rem var(--sans); color: var(--muted-foreground); }
+.filtre-bolum-ic h3 { margin: 6px 0 0; font: 500 .85rem var(--sans); color: var(--muted-foreground); }
 .panel-bas { padding-bottom: 6px; }
 .panel-alt { padding-top: 16px; position: sticky; bottom: -18px; background: var(--card); padding-bottom: 4px; }
 .arama-secenek { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -563,3 +563,12 @@ dialog.uc-boyut::backdrop { background: rgba(10, 20, 30, .65); }
 dialog.uc-boyut .galeri-kucuk { margin-top: 8px; }
 
 .tuzak { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+/* Yalnız ekran okuyucular için (görsel tasarımda yeri olmayan başlıklar) */
+.gizli { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Klavyeyle gezenler için görünür odak */
+a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.arama-kutu:focus-within { box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 45%, transparent); }
+.cift-kaydirici input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 45%, transparent); }
+.cift-kaydirici input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 45%, transparent); }

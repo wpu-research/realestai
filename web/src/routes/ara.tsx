@@ -71,7 +71,9 @@ ara.get("/", async (c) => {
   return c.html(
     <Sayfa baslik={t("İlanlar")} harita scriptler={["/js/sesli-arama.js", "/js/ara.js", "/js/kaydet.js"]}>
       <div class="ara-sayfa">
+        <h1 class="gizli">{t("Bodrum'da ilanlar")}</h1>
         <form class="filtre-panel" id="filtreler-form" method="get" action="/ara" data-filtre-panel>
+          <h2 class="gizli">{t("Filtreler")}</h2>
           <div class="panel-bas"><span class="ust-etiket">{t("Filtrele")}</span><button type="button" data-filtre-kapat aria-label={t("Kapat")}>✕</button></div>
 
           <Bolum baslik="Kategori" acik>
@@ -84,7 +86,7 @@ ara.get("/", async (c) => {
               <Cip ad="tip" deger="" etiket="Hepsi" secili={!f.tip} radyo />
               {Object.entries(TIP_ETIKET).map(([k, v]) => <Cip ad="tip" deger={k} etiket={v} secili={f.tip === k} radyo />)}
             </div>
-            <h4>{t("Konut tipi")}</h4>
+            <h3>{t("Konut tipi")}</h3>
             <Cipler ad="emlak_turu" liste={KONUT_TIPLERI} />
           </Bolum>
 
@@ -103,12 +105,12 @@ ara.get("/", async (c) => {
             )}
             <input type="hidden" name="yakin" value={f.yakin?.join(",") ?? ""} data-yakin-gizli />
             <div class="yakin-durum" data-yakin-durum></div>
-            <h4>{t("Adres bilgileri")}</h4>
+            <h3>{t("Adres bilgileri")}</h3>
             <div class="uc-adres">
               <label>{t("İl")}<select name="il" data-il><option value="">{t("Tümü")}</option>{iller.map((x) => <option selected={f.il === x}>{x}</option>)}</select></label>
               <label>{t("İlçe")}<select name="ilce" data-ilce><option value="">{t("Tümü")}</option>{ilceler.map((x) => <option selected={f.ilce === x}>{x}</option>)}</select></label>
             </div>
-            <h4>{t("Mahalle")}</h4>
+            <h3>{t("Mahalle")}</h3>
             <div class="cipler" data-mahalle-cipler>
               {mh.map((m) => (
                 <label class="filtre-cip" data-ilce-adi={m.ilce} data-il-adi={m.il}>
@@ -133,12 +135,12 @@ ara.get("/", async (c) => {
           </Bolum>
 
           <Bolum baslik="m²" acik={var_("min_brut_m2", "max_brut_m2", "min_net_m2", "max_net_m2")}>
-            <h4>{t("Brüt m²")}</h4>
+            <h3>{t("Brüt m²")}</h3>
             <div class="iki">
               <input type="number" name="min_brut_m2" value={f.min_brut_m2 ?? ""} min="0" placeholder={t("Min")} aria-label={t("En az brüt m²")} />
               <input type="number" name="max_brut_m2" value={f.max_brut_m2 ?? ""} min="0" placeholder={t("Max")} aria-label={t("En çok brüt m²")} />
             </div>
-            <h4>{t("Net m²")}</h4>
+            <h3>{t("Net m²")}</h3>
             <div class="iki">
               <input type="number" name="min_net_m2" value={f.min_net_m2 ?? ""} min="0" placeholder={t("Min")} aria-label={t("En az net m²")} />
               <input type="number" name="max_net_m2" value={f.max_net_m2 ?? ""} min="0" placeholder={t("Max")} aria-label={t("En çok net m²")} />
@@ -148,55 +150,55 @@ ara.get("/", async (c) => {
           <Bolum baslik="Konut özellikleri" acik={var_("oda", "bina_yasi", "kat_sayisi", "kat", "ara_kat", "isitma", "banyo", "mutfak",
             "balkon", "asansor", "otopark", "esya", "yapi_durumu", "site_ici", "ozel_alan", "tapu", "kimden", "ilan_tarihi", "fotolu",
             "videolu", "haritali", "cephe")}>
-            <h4>{t("Oda sayısı")}</h4>
+            <h3>{t("Oda sayısı")}</h3>
             <Cipler ad="oda" liste={ODA.map((o) => ({ k: o, e: o === "6+1" ? "6+1 ve üzeri" : o }))} />
-            <h4>{t("Bina yaşı")}</h4><Cipler ad="bina_yasi" liste={BINA_YASI} />
-            <h4>{t("Kat sayısı")}</h4><Cipler ad="kat_sayisi" liste={KAT_SAYISI} />
-            <h4>{t("Bulunduğu kat")}</h4>
+            <h3>{t("Bina yaşı")}</h3><Cipler ad="bina_yasi" liste={BINA_YASI} />
+            <h3>{t("Kat sayısı")}</h3><Cipler ad="kat_sayisi" liste={KAT_SAYISI} />
+            <h3>{t("Bulunduğu kat")}</h3>
             <div class="cipler">
               {BULUNDUGU_KAT.map((o) => <Cip ad="kat" deger={o.k} etiket={o.e} secili={dizide("kat", o.k)} />)}
               <Evet ad="ara_kat" etiket="Ara kat" />
             </div>
-            <h4>{t("Isıtma")}</h4><Cipler ad="isitma" liste={ISITMA} />
-            <h4>{t("Banyo sayısı")}</h4><Cipler ad="banyo" liste={BANYO} />
-            <h4>{t("Mutfak")}</h4><Cipler ad="mutfak" liste={MUTFAK} />
-            <h4>{t("Donanım")}</h4>
+            <h3>{t("Isıtma")}</h3><Cipler ad="isitma" liste={ISITMA} />
+            <h3>{t("Banyo sayısı")}</h3><Cipler ad="banyo" liste={BANYO} />
+            <h3>{t("Mutfak")}</h3><Cipler ad="mutfak" liste={MUTFAK} />
+            <h3>{t("Donanım")}</h3>
             <div class="cipler">
               <Evet ad="balkon" etiket="Balkon" /><Evet ad="asansor" etiket="Asansör" /><Evet ad="otopark" etiket="Otopark" />
             </div>
-            <h4>{t("Eşya")}</h4>
+            <h3>{t("Eşya")}</h3>
             <div class="cipler">
               <Cip ad="esya" deger="" etiket="Fark etmez" secili={!f.esya} radyo />
               <Cip ad="esya" deger="esyali" etiket="Eşyalı" secili={f.esya === "esyali"} radyo />
               <Cip ad="esya" deger="esyasiz" etiket="Eşyasız" secili={f.esya === "esyasiz"} radyo />
             </div>
-            <h4>{t("Kullanım durumu")}</h4><Cipler ad="yapi_durumu" liste={YAPI_DURUMU} />
-            <h4>{t("Konum tipi")}</h4>
+            <h3>{t("Kullanım durumu")}</h3><Cipler ad="yapi_durumu" liste={YAPI_DURUMU} />
+            <h3>{t("Konum tipi")}</h3>
             <div class="cipler"><Evet ad="site_ici" etiket="Site içerisinde" /><Evet ad="ozel_alan" etiket="Özel alanı bulunan" /></div>
-            <h4>{t("Tapu durumu")}</h4><Cipler ad="tapu" liste={TAPU} />
-            <h4>{t("Kimden")}</h4><Cipler ad="kimden" liste={KIMDEN} />
-            <h4>{t("İlan tarihi")}</h4>
+            <h3>{t("Tapu durumu")}</h3><Cipler ad="tapu" liste={TAPU} />
+            <h3>{t("Kimden")}</h3><Cipler ad="kimden" liste={KIMDEN} />
+            <h3>{t("İlan tarihi")}</h3>
             <div class="cipler">
               <Cip ad="ilan_tarihi" deger="" etiket="Fark etmez" secili={!f.ilan_tarihi} radyo />
               {ILAN_TARIHI.map((o) => <Cip ad="ilan_tarihi" deger={o.k} etiket={o.e} secili={String(f.ilan_tarihi ?? "") === o.k} radyo />)}
             </div>
-            <h4>{t("İlan içeriği")}</h4>
+            <h3>{t("İlan içeriği")}</h3>
             <div class="cipler"><Evet ad="fotolu" etiket="Fotoğraflı" /><Evet ad="videolu" etiket="Videolu" /><Evet ad="haritali" etiket="Haritada konumu belli" /></div>
-            <h4>{t("Cephe")}</h4><Cipler ad="cephe" liste={CEPHE} />
+            <h3>{t("Cephe")}</h3><Cipler ad="cephe" liste={CEPHE} />
           </Bolum>
 
           {OZELLIK_GRUPLARI.map((g) => (
             <Bolum baslik={g.baslik} acik={g.secenekler.some((o) => dizide("ozellik", o.k)) || (g.ad === "dis" && !!f.havuz)}>
               {g.ad === "dis" && (
                 <>
-                  <h4>{t("Havuz")}</h4>
+                  <h3>{t("Havuz")}</h3>
                   <div class="cipler">
                     <Cip ad="havuz" deger="" etiket="Fark etmez" secili={!f.havuz} radyo />
                     <Cip ad="havuz" deger="herhangi" etiket="Havuzlu" secili={f.havuz === "herhangi"} radyo />
                     <Cip ad="havuz" deger="ozel" etiket="Özel havuz" secili={f.havuz === "ozel"} radyo />
                     <Cip ad="havuz" deger="ortak" etiket="Ortak havuz" secili={f.havuz === "ortak"} radyo />
                   </div>
-                  <h4>{t("Diğer")}</h4>
+                  <h3>{t("Diğer")}</h3>
                 </>
               )}
               <Cipler ad="ozellik" liste={g.secenekler} />
@@ -256,6 +258,7 @@ ara.get("/", async (c) => {
                 <a href="/sihirbaz" class="dugme ikincil">{t("Sihirbazla yeniden dene")}</a>
               </div>
             )}
+            <h2 class="gizli">{t("Sonuçlar")}</h2>
             <div class="kartlar iki-sutun">{sonuclar.map((i) => <IlanKarti i={i} />)}</div>
             <script type="application/json" data-noktalar>{json(sonuclar.filter((i) => i.lat).map((i) => ({
               lat: i.lat, lng: i.lng, no: i.ilan_no, baslik: i.baslik, fiyat: fiyatMetni(i),

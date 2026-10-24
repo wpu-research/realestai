@@ -185,7 +185,8 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
               {fotolar.length > 1 && (
                 <div class="galeri-kucuk">
                   {fotolar.map((f, k) => (
-                    <button type="button" class={k === 0 ? "aktif" : ""} data-foto={kucuk(f.url, 1280)} title={t(ODA_ETIKET[f.oda_etiketi ?? ""] ?? "")}>
+                    <button type="button" class={k === 0 ? "aktif" : ""} data-foto={kucuk(f.url, 1280)} title={t(ODA_ETIKET[f.oda_etiketi ?? ""] ?? "")}
+                      aria-label={[t("Fotoğraf {n}", { n: k + 1 }), f.oda_etiketi ? t(ODA_ETIKET[f.oda_etiketi] ?? "") : ""].filter(Boolean).join(" · ")}>
                       <img src={kucuk(f.url, 240)} alt="" loading="lazy" />
                     </button>
                   ))}
@@ -206,7 +207,7 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
                 <p class="kucuk">{t("Fareyi gezdirin ya da parmağınızla kaydırın.")}</p>
                 {ucBoyut.length > 1 && (
                   <div class="galeri-kucuk">{ucBoyut.map((u, k) => (
-                    <button type="button" class={k === 0 ? "aktif" : ""} data-3d-sec={k}><img src={kucuk(u.foto, 240)} alt="" loading="lazy" /></button>
+                    <button type="button" class={k === 0 ? "aktif" : ""} data-3d-sec={k} aria-label={t("Fotoğraf {n}", { n: k + 1 })}><img src={kucuk(u.foto, 240)} alt="" loading="lazy" /></button>
                   ))}</div>
                 )}
                 <script type="application/json" data-3d-veri>{json(ucBoyut)}</script>
@@ -315,6 +316,7 @@ site.get("/mahalle/:slug", async (c) => {
         <span class="ust-etiket">{m.kiyi ? t("Kıyı mahallesi") : t("İç kesim")}</span>
         <h1>{m.ad}, {m.ilce}</h1>
         <p class="alt-baslik">{t("{n} yayında ilan", { n: ilanlar.length })}</p>
+        <h2 class="gizli">{t("İlanlar")}</h2>
         <div class="kartlar uc-sutun">{ilanlar.map((i) => <IlanKarti i={i} />)}</div>
         {ilanlar.length === 0 && <div class="bos"><p>{t("Bu mahallede şu an yayında ilan yok.")}</p><a href="/ara" class="dugme ikincil">{t("Tüm ilanlar")}</a></div>}
       </div>
@@ -386,6 +388,7 @@ site.get("/sihirbaz", async (c) => {
   return c.html(
     <Sayfa baslik={t("Size uygun evi bulalım")} harita scriptler={["/js/sihirbaz.js"]}>
       <div class="sihirbaz-kap">
+        <h1 class="gizli">{t("Size uygun evi bulalım")}</h1>
         <div class="sihirbaz" data-sihirbaz>
           <div class="sihirbaz-ilerleme"><div data-ilerleme></div></div>
           <div class="sihirbaz-govde" data-govde><p>{t("Yükleniyor…")}</p></div>
@@ -423,6 +426,7 @@ site.get("/asistan", async (c) => {
   return c.html(
     <Sayfa baslik={t("Didem'le konuşarak ara")} scriptler={["/js/asistan.js"]}>
       <div class="asistan-kap" data-asistan>
+        <h1 class="gizli">{t("Didem'le konuşarak ara")}</h1>
         <div class="avatar-alan">
           <div class="ai-etiket">{t("Yapay zekâ asistanı — Didem'in görünüşü ve sesiyle")}</div>
           <div class="avatar" data-avatar>

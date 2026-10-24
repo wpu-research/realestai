@@ -113,7 +113,7 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [], resi
             </div>
           </div>
         </footer>
-        <div class="cerez-bandi" data-cerez hidden>
+        <div class="cerez-bandi" data-cerez hidden role="region" aria-label={t("Çerez bildirimi")}>
           <p>{t("Sitemiz yalnızca çalışması için zorunlu çerezleri kullanır. Ayrıntılar çerez politikamızda.")} <a href="/yasal/cerez">{t("Çerez politikası")}</a></p>
           <button type="button" class="dugme" data-cerez-tamam>{t("Anladım")}</button>
         </div>
