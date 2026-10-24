@@ -9,6 +9,8 @@ import { ilkYonetici } from "./auth.js";
 import { getCookie, setCookie } from "hono/cookie";
 import { DILLER, dilIle, t, type Dil } from "./lib/dil.js";
 import { seo } from "./routes/seo.js";
+import { gorsel } from "./routes/gorsel.js";
+import { compress } from "hono/compress";
 import { istemciIp, say } from "./lib/sinir.js";
 import { UPLOAD_DIZIN } from "./config.js";
 import { migrate, sql } from "./db.js";
@@ -52,6 +54,18 @@ app.get("/saglik", async (c) => {
   await sql`select 1`;
   return c.json({ ok: true });
 });
+// Metin yanıtları sıkıştırılır (HTML, CSS, JS, JSON); görseller zaten sıkıştırılmış.
+app.use("*", compress());
+// Önbellek: CSS/JS deploy ile değişir, her seferinde 304 ile doğrulanır; görseller uzun süre tutulur.
+app.use("*", async (c, next) => {
+  await next();
+  if (c.res.headers.has("Cache-Control") || c.res.status !== 200) return;
+  const y = c.req.path;
+  if (y.startsWith("/css/") || y.startsWith("/js/")) c.header("Cache-Control", "no-cache");
+  else if (y.startsWith("/uploads/ilan/")) c.header("Cache-Control", "public, max-age=31536000, immutable");
+  else if (y.startsWith("/img/") || y.startsWith("/data/")) c.header("Cache-Control", "public, max-age=604800");
+});
+app.route("/", gorsel);
 app.use("/css/*", serveStatic({ root: gorece(join(kok, "public")) }));
 app.use("/js/*", serveStatic({ root: gorece(join(kok, "public")) }));
 app.use("/img/*", serveStatic({ root: gorece(join(kok, "public")) }));

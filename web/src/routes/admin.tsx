@@ -13,6 +13,7 @@ import { sql } from "../db.js";
 import { csvOku } from "../lib/csv.js";
 import { radarPuanla } from "../lib/radar.js";
 import { anahtarUret, eklentiPaketi } from "./eklenti.js";
+import { kucukleriSil } from "./gorsel.js";
 import {
   AVATAR_DIZIN, avatarAyar, avatarAyarKaydet, klonSesAcik, rizaGecerli, rizayiGeriAl, SesHatasi, sesAnahtarlariVar, sesUret,
 } from "../lib/avatar.js";
@@ -820,6 +821,7 @@ admin.post("/foto/:id", async (c) => {
   if (b.sil === "1") {
     await sql`delete from ilan_fotolari where id = ${f.id}`;
     if (f.url.startsWith("/uploads/")) await unlink(join(UPLOAD_DIZIN, f.url.slice("/uploads/".length))).catch(() => {});
+    await kucukleriSil(f.url);
   } else {
     const etiket = s(b, "oda_etiketi");
     await sql`update ilan_fotolari set sira = ${n(b, "sira") ?? f.sira},

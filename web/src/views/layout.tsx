@@ -164,7 +164,7 @@ export function IlanKarti({ i }: { i: IlanKart }) {
   return (
     <a href={`/ilan/${i.ilan_no}`} class="kart">
       <div class="kart-gorsel">
-        {kapak ? <img src={kapak} alt="" loading="lazy" /> : <div class="gorsel-yok"></div>}
+        {kapak ? <img src={kucuk(kapak, 640)} alt="" loading="lazy" /> : <div class="gorsel-yok"></div>}
         <span class="rozet rozet-tip">{t(TIP_ETIKET[i.tip])}</span>
         {i.demo && <span class="rozet rozet-demo">DEMO</span>}
         <button type="button" class="kalp" data-kaydet-ilan={i.ilan_no} aria-label={t("Kaydet")} aria-pressed="false">
@@ -197,3 +197,7 @@ export const Tuzak = () => (
     <label>Web sitesi<input name="web_sitesi" tabindex={-1} autocomplete="off" /></label>
   </div>
 );
+
+// Görselin istenen genişlikte WebP sürümü (routes/gorsel.ts); dış adresler olduğu gibi kalır.
+export const kucuk = (url: string | null | undefined, w: 240 | 480 | 640 | 960 | 1280): string =>
+  !url ? "" : /^\/(img|uploads\/ilan)\//.test(url) ? `/kucuk/${w}${url}` : url;

@@ -9,7 +9,7 @@ import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
 import { Ara, Ayar, Konum, Mikrofon, Ok, Onay } from "../views/ikon.js";
-import { demoDerinligi, demoGorselleri, Fiyat, IlanKarti, ilanMetni, json, mahalleGorseli, ornekGorsel, Sayfa, Tuzak } from "../views/layout.js";
+import { demoDerinligi, demoGorselleri, Fiyat, IlanKarti, ilanMetni, json, kucuk, mahalleGorseli, ornekGorsel, Sayfa, Tuzak } from "../views/layout.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 
 const etiket = (liste: { k: string; e: string }[], k: string | null) => (k ? t(liste.find((x) => x.k === k)?.e ?? k) : null);
@@ -50,7 +50,8 @@ site.get("/", async (c) => {
   return c.html(
     <Sayfa scriptler={["/js/sesli-arama.js"]}>
       <section class="hero">
-        <img class="hero-gorsel" src="/img/hero-bodrum.jpg" alt="" fetchpriority="high" />
+        <img class="hero-gorsel" src={kucuk("/img/hero-bodrum.jpg", 1280)} alt="" fetchpriority="high"
+          srcset={[640, 960, 1280].map((w) => `${kucuk("/img/hero-bodrum.jpg", w as 640)} ${w}w`).join(", ")} sizes="100vw" />
         <div class="hero-perde"></div>
         <div class="kap hero-ic">
           <h1>{t("Bodrum'da ev, sahibinden.")}</h1>
@@ -78,7 +79,7 @@ site.get("/", async (c) => {
           <div class="mahalle-izgara">
             {mh.map((m, k) => (
               <a href={`/mahalle/${m.slug}`} class="mahalle-karo">
-                <img src={mahalleGorseli(m.slug, k)} alt={`${m.ad} (temsili görsel)`} loading="lazy" />
+                <img src={kucuk(mahalleGorseli(m.slug, k), 480)} alt={`${m.ad} (temsili görsel)`} loading="lazy" />
                 <div class="mahalle-perde"></div>
                 <div class="mahalle-yazi"><strong>{m.ad}</strong><span>{m.ilce} · {m.n}</span></div>
               </a>
@@ -178,14 +179,14 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
         <div class="ilan-govde">
           <div class="ilan-sol">
             <div class="galeri" data-galeri>
-              <div class="galeri-ana"><img src={fotolar[0]?.url ?? ""} alt={metin.baslik} data-ana />{i.demo && <span class="temsili-etiket">{t("Temsili görsel")}</span>}
+              <div class="galeri-ana"><img src={kucuk(fotolar[0]?.url, 1280)} alt={metin.baslik} data-ana />{i.demo && <span class="temsili-etiket">{t("Temsili görsel")}</span>}
                 {ucBoyut.length > 0 && <button type="button" class="uc-boyut-dugme" data-3d-ac>{t("3D görünüm")} <small>({t("temsili")})</small></button>}
               </div>
               {fotolar.length > 1 && (
                 <div class="galeri-kucuk">
                   {fotolar.map((f, k) => (
-                    <button type="button" class={k === 0 ? "aktif" : ""} data-foto={f.url} title={t(ODA_ETIKET[f.oda_etiketi ?? ""] ?? "")}>
-                      <img src={f.url} alt="" loading="lazy" />
+                    <button type="button" class={k === 0 ? "aktif" : ""} data-foto={kucuk(f.url, 1280)} title={t(ODA_ETIKET[f.oda_etiketi ?? ""] ?? "")}>
+                      <img src={kucuk(f.url, 240)} alt="" loading="lazy" />
                     </button>
                   ))}
                 </div>
@@ -205,7 +206,7 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
                 <p class="kucuk">{t("Fareyi gezdirin ya da parmağınızla kaydırın.")}</p>
                 {ucBoyut.length > 1 && (
                   <div class="galeri-kucuk">{ucBoyut.map((u, k) => (
-                    <button type="button" class={k === 0 ? "aktif" : ""} data-3d-sec={k}><img src={u.foto} alt="" loading="lazy" /></button>
+                    <button type="button" class={k === 0 ? "aktif" : ""} data-3d-sec={k}><img src={kucuk(u.foto, 240)} alt="" loading="lazy" /></button>
                   ))}</div>
                 )}
                 <script type="application/json" data-3d-veri>{json(ucBoyut)}</script>
