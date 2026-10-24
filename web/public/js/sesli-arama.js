@@ -1,6 +1,6 @@
 // Arama kutusu: yazınca kelimeyle arar (normal form gönderimi); mikrofon ve örnek cümleler
 // "detaylı sesli arama"dır — konuşulan cümle yapay zekâyla filtrelere çevrilir.
-import { dinle, KonusmaTanima, postJson } from "./ortak.js";
+import { dinle, KonusmaTanima, postJson, SAYFA_DILI, t } from "./ortak.js";
 
 const kutu = document.querySelector("[data-sesli-arama]");
 if (kutu) {
@@ -13,18 +13,18 @@ if (kutu) {
 
   async function detayliAra(metin) {
     if (!metin.trim()) return;
-    durum.textContent = "Anlıyorum…";
+    durum.textContent = t("Anlıyorum…");
     kutu.classList.add("bekliyor");
     try {
       const temiz = onceki && Object.keys(onceki).length ? { ...onceki, kelime: undefined, sinir: undefined } : undefined;
-      const j = await postJson("/api/sesli-arama", { metin, dil: "tr", onceki: temiz });
+      const j = await postJson("/api/sesli-arama", { metin, dil: SAYFA_DILI, onceki: temiz });
       if (j.anlasilmadi) { durum.textContent = j.ozet; return; }
       try { sessionStorage.setItem("aramaOzeti", j.ozet); } catch {}
       location.href = j.url;
     } catch {
       // Yapay zekâ kullanılamıyorsa kelimeyle aramaya düş.
       if (kutu.tagName === "FORM") { kutu.dataset.dogrudan = "1"; kutu.submit(); return; }
-      durum.textContent = "Detaylı arama şu an kullanılamıyor; kelimeyle aramayı deneyin.";
+      durum.textContent = t("Detaylı arama şu an kullanılamıyor; kelimeyle aramayı deneyin.");
     } finally {
       kutu.classList.remove("bekliyor");
     }
@@ -44,11 +44,11 @@ if (kutu) {
     mikrofon.addEventListener("click", () => {
       if (kutu.classList.contains("dinliyor")) return;
       kutu.classList.add("dinliyor");
-      durum.textContent = "Dinliyorum… aradığınız evi anlatın.";
+      durum.textContent = t("Dinliyorum… aradığınız evi anlatın.");
       dinle({
         araSonuc: (m) => (girdi.value = m),
         bitti: (m) => { kutu.classList.remove("dinliyor"); durum.textContent = ""; if (m) detayliAra(m); },
-        hata: () => { kutu.classList.remove("dinliyor"); durum.textContent = "Mikrofona erişilemedi, yazarak arayabilirsiniz."; },
+        hata: () => { kutu.classList.remove("dinliyor"); durum.textContent = t("Mikrofona erişilemedi, yazarak arayabilirsiniz."); },
       });
     });
   }

@@ -6,6 +6,8 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ilkYonetici } from "./auth.js";
+import { getCookie, setCookie } from "hono/cookie";
+import { DILLER, dilIle, type Dil } from "./lib/dil.js";
 import { UPLOAD_DIZIN } from "./config.js";
 import { migrate, sql } from "./db.js";
 import { admin } from "./routes/admin.js";
@@ -22,6 +24,20 @@ await mkdir(UPLOAD_DIZIN, { recursive: true });
 const app = new Hono();
 
 app.use("*", secureHeaders({ crossOriginEmbedderPolicy: false, contentSecurityPolicy: undefined }));
+// Dil: ?dil=en ile seçilir (çereze yazılır ve parametresiz adrese dönülür), sonra çerezden okunur.
+app.use("*", async (c, next) => {
+  const istenen = c.req.query("dil");
+  if (istenen && (DILLER as readonly string[]).includes(istenen)) {
+    setCookie(c, "dil", istenen, { path: "/", maxAge: 365 * 86400, sameSite: "Lax" });
+    const u = new URL(c.req.url);
+    u.searchParams.delete("dil");
+    return c.redirect(u.pathname + u.search);
+  }
+  const cerez = getCookie(c, "dil");
+  const d = (DILLER as readonly string[]).includes(cerez ?? "") ? (cerez as Dil) : "tr";
+  // Admin paneli Türkçe kalır.
+  return dilIle(c.req.path.startsWith("/admin") ? "tr" : d, () => next());
+});
 app.get("/saglik", async (c) => {
   await sql`select 1`;
   return c.json({ ok: true });

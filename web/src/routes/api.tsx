@@ -3,6 +3,10 @@ import { asistan, sesliArama, type AsistanMesaj } from "../ai/claude.js";
 import { sql } from "../db.js";
 import { filtreUrl, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { IlanKarti } from "../views/layout.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { t } from "../lib/dil.js";
 
 export const api = new Hono();
 
@@ -87,4 +91,19 @@ api.get("/kartlar", async (c) => {
   const kartlar = (await ilanAra({}, { limit: 500 }) as IlanKart[]).filter((i) => nolar.includes(i.ilan_no))
     .sort((a, b) => nolar.indexOf(a.ilan_no) - nolar.indexOf(b.ilan_no));
   return c.html(<>{kartlar.map((i) => <IlanKarti i={i} />)}</>);
+});
+
+// Sihirbaz soruları seçili dilde (data/sihirbaz.json Türkçe kaynaktır).
+const SIHIRBAZ = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "data", "sihirbaz.json"), "utf8"));
+api.get("/sihirbaz", (c) => {
+  const cevir = (x: any): any => {
+    if (Array.isArray(x)) return x.map(cevir);
+    if (x && typeof x === "object") {
+      return Object.fromEntries(Object.entries(x).map(([k, v]) =>
+        [k, typeof v === "string" && ["soru", "etiket", "yardim"].includes(k) ? t(v)
+          : k === "birimEtiketi" ? Object.fromEntries(Object.entries(v as Record<string, string>).map(([a, b]) => [a, t(b)])) : cevir(v)]));
+    }
+    return x;
+  };
+  return c.json(cevir(SIHIRBAZ));
 });

@@ -1,8 +1,19 @@
-// Ortak yardımcılar: konuşma tanıma ve sesli okuma (tarayıcının kendi motorları).
+// Ortak yardımcılar: çeviri, konuşma tanıma ve sesli okuma (tarayıcının kendi motorları).
+
+// Sayfaya gömülü çeviriler (sunucu seçili dile göre üretir). Anahtar Türkçe metindir.
+const CEVIRI = (() => { try { return JSON.parse(document.getElementById("ceviri")?.textContent || "{}"); } catch { return {}; } })();
+export function t(metin, degisken) {
+  let s = CEVIRI[metin] ?? metin;
+  if (degisken) for (const [k, v] of Object.entries(degisken)) s = s.replaceAll(`{${k}}`, String(v));
+  return s;
+}
+export const SAYFA_DILI = document.documentElement.lang || "tr";
+export const SES_DILI = document.documentElement.dataset.sesDili || "tr-TR";
+export const YEREL = { tr: "tr-TR", en: "en-GB", ru: "ru-RU", de: "de-DE" }[SAYFA_DILI] ?? "tr-TR";
 
 export const KonusmaTanima = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-export function dinle({ dil = "tr-TR", araSonuc, bitti, hata }) {
+export function dinle({ dil = SES_DILI, araSonuc, bitti, hata }) {
   const r = new KonusmaTanima();
   r.lang = dil;
   r.interimResults = true;
@@ -25,7 +36,7 @@ if ("speechSynthesis" in window) {
   speechSynthesis.onvoiceschanged = yukle;
 }
 
-export function soyle(metin, { dil = "tr-TR", basladi, bitti } = {}) {
+export function soyle(metin, { dil = SES_DILI, basladi, bitti } = {}) {
   if (!("speechSynthesis" in window)) { bitti?.(); return; }
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(metin);

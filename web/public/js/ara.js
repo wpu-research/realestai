@@ -1,6 +1,6 @@
 // Arama sayfası: filtre paneli, fiyat kaydırıcısı, adres zinciri, yakınımda ara ve
 // Airbnb gibi harita (kaydırınca/yakınlaştırınca liste görünen alana göre yenilenir).
-import { escape } from "./ortak.js";
+import { escape, t, YEREL } from "./ortak.js";
 
 const BODRUM = [[36.95, 27.2], [37.16, 27.5]];
 const panel = document.querySelector("[data-filtre-panel]");
@@ -35,7 +35,7 @@ if (kayd) {
   const dolu = kayd.querySelector("[data-dolu]");
   const eMin = panel.querySelector("[data-etiket-min]");
   const eMax = panel.querySelector("[data-etiket-max]");
-  const bicim = (x) => new Intl.NumberFormat("tr-TR", { notation: x >= 1e6 ? "compact" : "standard", maximumFractionDigits: 1 }).format(x);
+  const bicim = (x) => new Intl.NumberFormat(YEREL, { notation: x >= 1e6 ? "compact" : "standard", maximumFractionDigits: 1 }).format(x);
 
   const ciz = () => {
     const a = Number(aMin.value), b = Number(aMax.value);
@@ -84,8 +84,8 @@ const yakinDurum = panel.querySelector("[data-yakin-durum]");
 panel.querySelector("[data-yakinimda]")?.addEventListener("click", () => {
   const gizli = panel.querySelector("[data-yakin-gizli]");
   if (gizli.value) { gizli.value = ""; gonder(); return; }   // açıksa kapat
-  if (!navigator.geolocation) { yakinDurum.textContent = "Tarayıcınız konum paylaşımını desteklemiyor."; return; }
-  yakinDurum.textContent = "Konum izni bekleniyor…";
+  if (!navigator.geolocation) { yakinDurum.textContent = t("Tarayıcınız konum paylaşımını desteklemiyor."); return; }
+  yakinDurum.textContent = t("Konum izni bekleniyor…");
   navigator.geolocation.getCurrentPosition(
     (p) => {
       gizli.value = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`;
@@ -94,8 +94,8 @@ panel.querySelector("[data-yakinimda]")?.addEventListener("click", () => {
     },
     (h) => {
       yakinDurum.textContent = h.code === 1
-        ? "Konum izni verilmedi. Tarayıcı ayarlarından izin verebilir ya da adres seçebilirsiniz."
-        : "Konumunuz alınamadı, lütfen tekrar deneyin.";
+        ? t("Konum izni verilmedi. Tarayıcı ayarlarından izin verebilir ya da adres seçebilirsiniz.")
+        : t("Konumunuz alınamadı, lütfen tekrar deneyin.");
     },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
   );
@@ -201,7 +201,7 @@ if (el && window.L) {
   isaretle(ilk);
   // Yakınımda aramasında kullanıcının konumunu göster.
   const yakin = new URL(location.href).searchParams.get("yakin")?.split(",").map(Number);
-  if (yakin?.length === 2) L.circleMarker(yakin, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(harita).bindTooltip("Konumunuz");
+  if (yakin?.length === 2) L.circleMarker(yakin, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(harita).bindTooltip(t("Konumunuz"));
   setTimeout(() => (sistemHareketi = false), 600);
 
   let zamanlayici;

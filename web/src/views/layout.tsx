@@ -7,6 +7,8 @@ import { SITE_ADI } from "../config.js";
 import { KUR, type IlanKart } from "../lib/arama.js";
 import { para, TIP_ETIKET } from "../lib/bicim.js";
 import { Alan, Kisi, Menu, Yatak } from "./ikon.js";
+import { dil, istemciCevirileri, SES_DILI, t } from "../lib/dil.js";
+import { ISTEMCI_METINLERI } from "../lib/istemci-metinleri.js";
 
 type SayfaProps = {
   baslik?: string;
@@ -20,12 +22,12 @@ const KALP = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.
 
 export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: SayfaProps) {
   return (
-    <html lang="tr">
+    <html lang={dil()} data-ses-dili={SES_DILI[dil()]}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{baslik ? `${baslik} · ${SITE_ADI}` : `${SITE_ADI} · Bodrum'da ev, sahibinden`}</title>
-        <meta name="description" content={aciklama ?? "Bodrum ve çevresinde sahibinin yetki verdiği, doğrulanmış satılık, kiralık, sezonluk ve günlük evler."} />
+        <title>{baslik ? `${baslik} · ${SITE_ADI}` : `${SITE_ADI} · ${t("Bodrum'da ev, sahibinden")}`}</title>
+        <meta name="description" content={aciklama ?? t("Bodrum ve çevresinde sahibinin yetki verdiği, doğrulanmış satılık, kiralık, sezonluk ve günlük evler.")} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -37,24 +39,21 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: Sa
           <div class="kap ust-ic">
             <a href="/" class="logo">{SITE_ADI}</a>
             <nav class="ust-nav" data-menu>
-              <a href="/ara">İlanlar</a>
-              <a href="/evimi-listele">Evinizi listeleyin</a>
+              <a href="/ara">{t("İlanlar")}</a>
+              <a href="/evimi-listele">{t("Evinizi listeleyin")}</a>
             </nav>
             <div class="ust-sag">
-              <a href="/kaydedilenler" class="kayit-link" aria-label="Kaydedilenler" title="Kaydedilenler">
+              <a href="/kaydedilenler" class="kayit-link" aria-label={t("Kaydedilenler")} title={t("Kaydedilenler")}>
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d={KALP} /></svg>
                 <span class="rozet-sayi" data-kayit-sayi hidden></span>
               </a>
-              <select class="ust-secim" aria-label="Dil" data-dil>
-                <option value="tr" selected>TR</option>
-                <option value="en" disabled title="Yakında">EN</option>
-                <option value="ru" disabled title="Yakında">RU</option>
-                <option value="de" disabled title="Yakında">DE</option>
+              <select class="ust-secim" aria-label={t("Dil")} data-dil>
+                {["tr", "en", "ru", "de"].map((d) => <option value={d} selected={dil() === d}>{d.toUpperCase()}</option>)}
               </select>
-              <select class="ust-secim" aria-label="Para birimi" data-para-birimi>
+              <select class="ust-secim" aria-label={t("Para birimi")} data-para-birimi>
                 {["TRY", "EUR", "USD", "GBP"].map((p) => <option value={p}>{p}</option>)}
               </select>
-              <button type="button" class="menu-dugme" aria-label="Menü" onclick="document.querySelector('[data-menu]').classList.toggle('acik')"><Menu boyut={22} /></button>
+              <button type="button" class="menu-dugme" aria-label={t("Menü")} onclick="document.querySelector('[data-menu]').classList.toggle('acik')"><Menu boyut={22} /></button>
             </div>
           </div>
         </header>
@@ -64,34 +63,35 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: Sa
             <div>
               <a href="/" class="logo">{SITE_ADI}</a>
               <p>Bodrum · Milas · Didim</p>
-              <p class="kucuk">Taşınmaz Ticareti Yetki Belgesi No: [doldurulacak]</p>
+              <p class="kucuk">{t("Taşınmaz Ticareti Yetki Belgesi No")}: [doldurulacak]</p>
               <p class="alt-araclar">
-                <a href="/endeks">Emlak endeksi</a> · <a href="/kredi">Kredi hesapla</a> · <a href="/emlakci-bul">Bana emlakçı bul</a> · <a href="/ekspertiz">Ekspertiz</a> ·{" "}
-                <a href="/rehber/alirken">Alırken</a> · <a href="/rehber/satarken">Satarken</a> · <a href="/rehber/kiralarken">Kiralarken</a> ·{" "}
-                <a href="/asistan">Didem'le konuş</a>
+                <a href="/endeks">{t("Emlak endeksi")}</a> · <a href="/kredi">{t("Kredi hesapla")}</a> · <a href="/emlakci-bul">{t("Bana emlakçı bul")}</a> · <a href="/ekspertiz">{t("Ekspertiz")}</a> ·{" "}
+                <a href="/rehber/alirken">{t("Alırken")}</a> · <a href="/rehber/satarken">{t("Satarken")}</a> · <a href="/rehber/kiralarken">{t("Kiralarken")}</a> ·{" "}
+                <a href="/sihirbaz">{t("Adım adım ara")}</a> · <a href="/asistan">{t("Didem'le konuş")}</a>
               </p>
             </div>
             <div class="alt-sutun">
-              <strong>Yasal</strong>
-              <a href="/yasal/kvkk">KVKK Aydınlatma Metni</a>
-              <a href="/yasal/acik-riza">Açık Rıza Metni</a>
-              <a href="/yasal/cerez">Çerez Politikası</a>
-              <a href="/yasal/kullanim">Kullanım Koşulları</a>
-              <a href="/yasal/iys">Ticari İleti Onay Metni</a>
+              <strong>{t("Yasal")}</strong>
+              <a href="/yasal/kvkk">{t("KVKK Aydınlatma Metni")}</a>
+              <a href="/yasal/acik-riza">{t("Açık Rıza Metni")}</a>
+              <a href="/yasal/cerez">{t("Çerez Politikası")}</a>
+              <a href="/yasal/kullanim">{t("Kullanım Koşulları")}</a>
+              <a href="/yasal/iys">{t("Ticari İleti Onay Metni")}</a>
             </div>
             <div class="alt-sutun">
-              <strong>İletişim</strong>
-              <span>[telefon — doldurulacak]</span>
-              <span>[e-posta — doldurulacak]</span>
+              <strong>{t("İletişim")}</strong>
+              <span>[{t("telefon")} — doldurulacak]</span>
+              <span>[{t("e-posta")} — doldurulacak]</span>
               <span>Instagram · Facebook · WhatsApp</span>
             </div>
           </div>
         </footer>
         <div class="cerez-bandi" data-cerez hidden>
-          <p>Sitemiz yalnızca çalışması için zorunlu çerezleri kullanır. Ayrıntılar çerez politikamızda. <a href="/yasal/cerez">Çerez politikası</a></p>
-          <button type="button" class="dugme" data-cerez-tamam>Anladım</button>
+          <p>{t("Sitemiz yalnızca çalışması için zorunlu çerezleri kullanır. Ayrıntılar çerez politikamızda.")} <a href="/yasal/cerez">{t("Çerez politikası")}</a></p>
+          <button type="button" class="dugme" data-cerez-tamam>{t("Anladım")}</button>
         </div>
         <script id="kurlar" type="application/json">{json(KUR)}</script>
+        <script id="ceviri" type="application/json">{json(istemciCevirileri(ISTEMCI_METINLERI))}</script>
         {harita && <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>}
         {[...new Set([...scriptler, "/js/kaydet.js", "/js/genel.js"])].map((s) => <script type="module" src={s}></script>)}
       </body>
@@ -117,6 +117,12 @@ export const demoGorselleri = (no: number) =>
 
 const BIRIM: Record<string, string> = { toplam: "", aylik: " /ay", sezon: " sezon toplamı", gecelik: " /gece" };
 
+// İlan başlık/açıklaması: seçili dilde çeviri varsa o, yoksa Türkçe.
+export function ilanMetni(i: { baslik: string; aciklama?: string; ceviriler?: Record<string, { baslik?: string; aciklama?: string }> }) {
+  const c = dil() === "tr" ? undefined : i.ceviriler?.[dil()];
+  return { baslik: c?.baslik || i.baslik, aciklama: c?.aciklama || i.aciklama || "" };
+}
+
 // Fiyat: sunucu ilanın kendi para biriminde yazar; üstteki para birimi seçimine göre tarayıcı çevirir.
 export function Fiyat({ tutar, pb, ek = "", sinif }: { tutar: number; pb: string; ek?: string; sinif?: string }) {
   return <span class={sinif} data-tutar={tutar} data-pb={pb} data-ek={ek}>{para(tutar, pb)}{ek}</span>;
@@ -129,24 +135,24 @@ export function IlanKarti({ i }: { i: IlanKart }) {
     <a href={`/ilan/${i.ilan_no}`} class="kart">
       <div class="kart-gorsel">
         {kapak ? <img src={kapak} alt="" loading="lazy" /> : <div class="gorsel-yok"></div>}
-        <span class="rozet rozet-tip">{TIP_ETIKET[i.tip]}</span>
+        <span class="rozet rozet-tip">{t(TIP_ETIKET[i.tip])}</span>
         {i.demo && <span class="rozet rozet-demo">DEMO</span>}
-        <button type="button" class="kalp" data-kaydet-ilan={i.ilan_no} aria-label="Kaydet" aria-pressed="false">
+        <button type="button" class="kalp" data-kaydet-ilan={i.ilan_no} aria-label={t("Kaydet")} aria-pressed="false">
           <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"><path d={KALP} /></svg>
         </button>
         {i.iskonto != null && i.iskonto >= 0.15 && (
-          <span class="rozet rozet-firsat">Bölge ortalamasının %{Math.round(i.iskonto * 100)} altında</span>
+          <span class="rozet rozet-firsat">{t("Bölge ortalamasının %{n} altında", { n: Math.round(i.iskonto * 100) })}</span>
         )}
       </div>
       <div class="kart-govde">
-        <h3>{i.baslik}</h3>
+        <h3>{ilanMetni(i).baslik}</h3>
         <div class="kart-yer">{i.mahalle ?? "Bodrum"}, {i.ilce ?? "Bodrum"}{i.mesafe_km != null && ` · ${i.mesafe_km < 1 ? "<1" : Math.round(i.mesafe_km)} km`}</div>
         <div class="kart-ozellik">
           {i.oda && <span><Yatak boyut={14} />{i.oda}</span>}
           {i.net_m2 && <span><Alan boyut={14} />{i.net_m2} m²</span>}
-          {i.yatak_kapasitesi && <span><Kisi boyut={14} />{i.yatak_kapasitesi} kişi</span>}
+          {i.yatak_kapasitesi && <span><Kisi boyut={14} />{i.yatak_kapasitesi} {t("kişi")}</span>}
         </div>
-        <div class="kart-fiyat"><Fiyat tutar={fiyat} pb={i.para_birimi} ek={BIRIM[i.fiyat_birimi]} /></div>
+        <div class="kart-fiyat"><Fiyat tutar={fiyat} pb={i.para_birimi} ek={t(BIRIM[i.fiyat_birimi])} /></div>
         {i.tip === "satilik" && i.net_m2 && <div class="kart-m2"><Fiyat tutar={Math.round(i.fiyat / i.net_m2)} pb={i.para_birimi} ek=" / m²" /></div>}
       </div>
     </a>

@@ -1,4 +1,6 @@
 // Kaydetme: favori ilanlar ve kayıtlı aramalar bu cihazın tarayıcısında tutulur (üyelik yok).
+import { t } from "./ortak.js";
+
 const ILAN = "kaydedilenIlanlar";
 const ARAMA = "kaydedilenAramalar";
 
@@ -31,9 +33,9 @@ function kalpleriCiz() {
     const kayitli = secili.has(no);
     b.classList.toggle("kayitli", kayitli);
     b.setAttribute("aria-pressed", String(kayitli));
-    b.setAttribute("aria-label", kayitli ? "Kaydedilenlerden çıkar" : "Kaydet");
+    b.setAttribute("aria-label", kayitli ? t("Kaydedilenlerden çıkar") : t("Kaydet"));
     const yazi = b.querySelector("[data-yazi]");
-    if (yazi) yazi.textContent = kayitli ? "Kaydedildi" : "Kaydet";
+    if (yazi) yazi.textContent = kayitli ? t("Kaydedildi") : t("Kaydet");
   });
 }
 
@@ -52,12 +54,12 @@ document.addEventListener("click", (e) => {
     const url = new URL(location.href);
     url.searchParams.delete("sinir");   // harita alanı geçici; kayıtlı aramada tutma
     const yol = url.pathname + url.search;
-    const ad = prompt("Bu aramaya bir ad verin:", document.querySelector("[data-sonuc-sayi]")?.textContent?.split("·")[0].trim() ? "Bodrum araması" : "Aramam");
+    const ad = prompt(t("Bu aramaya bir ad verin:"), t("Bodrum araması"));
     if (ad === null) return;
     const liste = oku(ARAMA).filter((a) => a.url !== yol);
-    liste.unshift({ ad: ad.trim() || "Aramam", url: yol, tarih: new Date().toISOString() });
+    liste.unshift({ ad: ad.trim() || t("Aramam"), url: yol, tarih: new Date().toISOString() });
     yaz(ARAMA, liste.slice(0, 50));
-    arama.textContent = "✓ Arama kaydedildi";
+    arama.textContent = "✓ " + t("Arama kaydedildi");
   }
 });
 

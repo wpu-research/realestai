@@ -1,7 +1,8 @@
 // Konut kredisi: eşit taksitli (anüite) hesap.
+import { t, YEREL } from "./ortak.js";
 const form = document.querySelector("[data-kredi]");
 const sonuc = document.querySelector("[data-sonuc]");
-const tl = (x) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Math.round(x)) + " ₺";
+const tl = (x) => new Intl.NumberFormat(YEREL, { maximumFractionDigits: 0 }).format(Math.round(x)) + " ₺";
 const yaz = (k, v) => (sonuc.querySelector(`[data-k=${k}]`).textContent = v);
 
 function hesapla() {
@@ -30,7 +31,7 @@ function hesapla() {
     satirlar.push(`<tr><td>${ay}</td><td>${tl(taksit)}</td><td>${tl(anapara)}</td><td>${tl(faiz)}</td><td>${tl(Math.max(kalan, 0))}</td></tr>`);
   }
   sonuc.querySelector("[data-plan]").innerHTML =
-    `<table class="plan"><thead><tr><th>Ay</th><th>Taksit</th><th>Anapara</th><th>Faiz</th><th>Kalan</th></tr></thead><tbody>${satirlar.join("")}</tbody></table>`;
+    `<table class="plan"><thead><tr><th>${t("Ay")}</th><th>${t("Taksit")}</th><th>${t("Anapara")}</th><th>${t("Faiz")}</th><th>${t("Kalan")}</th></tr></thead><tbody>${satirlar.join("")}</tbody></table>`;
 }
 form.addEventListener("input", hesapla);
 form.addEventListener("submit", (e) => e.preventDefault());

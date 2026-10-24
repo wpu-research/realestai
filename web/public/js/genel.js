@@ -36,3 +36,10 @@ if (secim) {
 }
 fiyatlariCevir();
 document.addEventListener("kartlar-yenilendi", () => fiyatlariCevir());
+
+// ---------- Dil ----------
+document.querySelector("[data-dil]")?.addEventListener("change", (e) => {
+  const u = new URL(location.href);
+  u.searchParams.set("dil", e.target.value);
+  location.href = u.toString();
+});

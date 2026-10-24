@@ -124,6 +124,7 @@ export type IlanKart = {
   havuz: string; deniz_manzarasi: boolean; denize_mesafe_m: number | null;
   fiyat: number; para_birimi: string; fiyat_birimi: string; donem_fiyati: number;
   iskonto: number | null; kapak: string | null; yayinlandi_at: Date | null; mesafe_km: number | null;
+  ceviriler: Record<string, { baslik?: string; aciklama?: string }>;
 };
 
 // Bant listesinden (bina yaşı, kat…) "kolon şu aralıklardan birinde" koşulu.
@@ -218,7 +219,7 @@ export async function ilanAra(f: Filtreler, opt: { limit?: number; sayim?: boole
   }[siralama] ?? sql`i.yayinlandi_at desc`;
 
   return sql<IlanKart[]>`
-    select i.id, i.ilan_no, i.tip, i.emlak_turu, i.baslik, i.demo,
+    select i.id, i.ilan_no, i.tip, i.emlak_turu, i.baslik, i.demo, i.ceviriler,
            m.ad as mahalle, m.slug as mahalle_slug, m.ilce,
            coalesce(i.lat, m.lat) as lat, coalesce(i.lng, m.lng) as lng,
            i.net_m2, i.oda, i.yatak_kapasitesi, i.havuz, i.deniz_manzarasi, i.denize_mesafe_m,

@@ -1,6 +1,6 @@
 // "Didem'le konuşarak ara": asistan konuşur (sesli okuma), kullanıcı konuşur/yazar/çipe dokunur.
 // Avatar katmanı ayrı: şimdilik fotoğraf + tarayıcı sesi; gerçek video avatar aynı arayüzle takılacak.
-import { dinle, escape, KonusmaTanima, postJson, soyle, sustur } from "./ortak.js";
+import { dinle, escape, KonusmaTanima, postJson, SAYFA_DILI, soyle, sustur, t, YEREL } from "./ortak.js";
 
 const kok = document.querySelector("[data-asistan]");
 const avatarEl = kok.querySelector("[data-avatar]");
@@ -35,7 +35,7 @@ function dinlemeyiBaslat() {
   if (!KonusmaTanima || tanima || durum.mesajlar.length >= MAX_TUR * 2) return;
   mikrofon.classList.add("dinliyor");
   clearTimeout(sessizlikZamani);
-  sessizlikZamani = setTimeout(() => { tanima?.stop(); altyazi.textContent = "Devam etmek için mikrofona dokunun ya da yazın."; }, 30_000);
+  sessizlikZamani = setTimeout(() => { tanima?.stop(); altyazi.textContent = t("Devam etmek için mikrofona dokunun ya da yazın."); }, 30_000);
   tanima = dinle({
     araSonuc: (m) => (girdi.value = m),
     bitti: (m) => {
@@ -56,25 +56,25 @@ function ciz(yanit) {
   }));
   if (yanit) {
     secenekEl.innerHTML = (yanit.secenekler ?? []).map((s) => `<button type="button" class="cip">${escape(s)}</button>`).join("")
-      + (yanit.tamamlandi ? `<a class="dugme" href="${yanit.url}">İlanları göster</a>` : "");
+      + (yanit.tamamlandi ? `<a class="dugme" href="${escape(yanit.url)}">${t("İlanları göster")}</a>` : "");
     secenekEl.querySelectorAll("button.cip").forEach((b) => b.addEventListener("click", () => gonder(b.textContent)));
   }
 }
 
 function anlasilanEtiketleri(f) {
-  const TIP = { satilik: "Satılık", kiralik: "Kiralık", sezonluk: "Sezonluk", gunluk: "Tatil" };
+  const TIP = { satilik: t("Satılık"), kiralik: t("Kiralık"), sezonluk: t("Sezonluk"), gunluk: t("Tatil") };
   const e = [];
   if (f.tip) e.push(["tip", TIP[f.tip]]);
-  if (f.min_kapasite) e.push(["min_kapasite", `${f.min_kapasite}+ kişi`]);
-  if (f.giris_tarihi) e.push(["giris_tarihi", `Giriş ${f.giris_tarihi}`]);
-  if (f.max_fiyat) e.push(["max_fiyat", `≤ ${Number(f.max_fiyat).toLocaleString("tr-TR")} ${f.para_birimi ?? "TRY"}`]);
-  if (f.min_fiyat) e.push(["min_fiyat", `≥ ${Number(f.min_fiyat).toLocaleString("tr-TR")} ${f.para_birimi ?? "TRY"}`]);
+  if (f.min_kapasite) e.push(["min_kapasite", `${f.min_kapasite}+ ${t("kişi")}`]);
+  if (f.giris_tarihi) e.push(["giris_tarihi", `${t("Giriş")} ${f.giris_tarihi}`]);
+  if (f.max_fiyat) e.push(["max_fiyat", `≤ ${Number(f.max_fiyat).toLocaleString(YEREL)} ${f.para_birimi ?? "TRY"}`]);
+  if (f.min_fiyat) e.push(["min_fiyat", `≥ ${Number(f.min_fiyat).toLocaleString(YEREL)} ${f.para_birimi ?? "TRY"}`]);
   if (f.mahalleler?.length) e.push(["mahalleler", f.mahalleler.join(", ")]);
   if (f.oda?.length) e.push(["oda", f.oda.join(", ")]);
-  if (f.havuz) e.push(["havuz", f.havuz === "ozel" ? "Özel havuz" : "Havuz"]);
-  if (f.deniz_manzarasi) e.push(["deniz_manzarasi", "Deniz manzarası"]);
-  if (f.max_denize_mesafe_m) e.push(["max_denize_mesafe_m", `Denize ≤ ${f.max_denize_mesafe_m} m`]);
-  if (f.sadece_firsat) e.push(["sadece_firsat", "Fırsatlar"]);
+  if (f.havuz) e.push(["havuz", f.havuz === "ozel" ? t("Özel havuz") : t("Havuz")]);
+  if (f.deniz_manzarasi) e.push(["deniz_manzarasi", t("Deniz manzarası")]);
+  if (f.max_denize_mesafe_m) e.push(["max_denize_mesafe_m", `${t("Denize")} ≤ ${f.max_denize_mesafe_m} m`]);
+  if (f.sadece_firsat) e.push(["sadece_firsat", t("Fırsatlar")]);
   return e;
 }
 
@@ -94,7 +94,7 @@ async function gonder(metin) {
   ciz();
   try {
     const y = await postJson("/api/asistan", {
-      mesajlar: durum.mesajlar, filtreler: durum.filtreler, dil: "tr", oturum_id: durum.oturum_id,
+      mesajlar: durum.mesajlar, filtreler: durum.filtreler, dil: SAYFA_DILI, oturum_id: durum.oturum_id,
     });
     durum.mesajlar.push({ rol: "asistan", metin: y.cevap });
     durum.filtreler = y.filtreler ?? durum.filtreler;
@@ -107,8 +107,8 @@ async function gonder(metin) {
       else dinlemeyiBaslat();
     });
   } catch {
-    altyazi.textContent = "Şu an bağlantı kuramıyorum, sihirbazla devam edebilirsiniz.";
-    secenekEl.innerHTML = `<a class="dugme" href="/sihirbaz">Sihirbaza geç</a>`;
+    altyazi.textContent = t("Şu an bağlantı kuramıyorum, sihirbazla devam edebilirsiniz.");
+    secenekEl.innerHTML = `<a class="dugme" href="/sihirbaz">${t("Sihirbaza geç")}</a>`;
   } finally {
     bekliyor = false;
     kok.classList.remove("bekliyor");
@@ -121,7 +121,7 @@ mikrofon.addEventListener("click", () => { avatar.sus(); tanima ? tanima.stop() 
 
 // Avatar kendiliğinden başlamaz (tarayıcılar da kullanıcı etkileşimi olmadan sesi engeller).
 if (durum.mesajlar.length) {
-  basla.textContent = "Konuşmaya devam et";
+  basla.textContent = t("Konuşmaya devam et");
   ciz();
 }
 basla.addEventListener("click", () => {
@@ -129,7 +129,7 @@ basla.addEventListener("click", () => {
   giris.hidden = false;
   if (durum.mesajlar.length) {
     const son = durum.mesajlar.at(-1);
-    if (son.rol === "asistan") avatar.konus("Kaldığımız yerden devam edelim. " + son.metin, dinlemeyiBaslat);
+    if (son.rol === "asistan") avatar.konus(t("Kaldığımız yerden devam edelim.") + " " + son.metin, dinlemeyiBaslat);
     else gonder(null);
   } else gonder(null);
 });

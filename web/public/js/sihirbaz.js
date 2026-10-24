@@ -1,5 +1,5 @@
 // Arama sihirbazı: data/sihirbaz.json'daki soruları tek tek sorar, filtreleri üretir.
-import { escape, postJson } from "./ortak.js";
+import { escape, postJson, t, YEREL } from "./ortak.js";
 
 const kok = document.querySelector("[data-sihirbaz]");
 const govde = kok.querySelector("[data-govde]");
@@ -8,7 +8,7 @@ const geriB = kok.querySelector("[data-geri]");
 const atlaB = kok.querySelector("[data-atla]");
 const MAHALLELER = JSON.parse(document.getElementById("mahalleler").textContent);
 
-const { adimlar } = await (await fetch("/data/sihirbaz.json")).json();
+const { adimlar } = await (await fetch("/api/sihirbaz")).json();
 const cevap = {};          // adim.id → seçilen değer(ler)
 const yol = [];            // gösterilen adım indeksleri (geri için)
 let aktif = 0;
@@ -115,11 +115,11 @@ function cokluSecim(a, ic) {
 
 function tarihAraligi(a, ic) {
   const v = cevap[a.id] ?? {};
-  ic.innerHTML = `<div class="iki"><label>Giriş<input type="date" name="giris" value="${v.giris ?? ""}"></label>
-    <label>Çıkış<input type="date" name="cikis" value="${v.cikis ?? ""}"></label></div>`;
+  ic.innerHTML = `<div class="iki"><label>${t("Giriş")}<input type="date" name="giris" value="${v.giris ?? ""}"></label>
+    <label>${t("Çıkış")}<input type="date" name="cikis" value="${v.cikis ?? ""}"></label></div>`;
   devamDugmesi(ic, () => {
     const giris = ic.querySelector("[name=giris]").value, cikis = ic.querySelector("[name=cikis]").value;
-    if (!giris) return alert("Lütfen giriş tarihini seçin.");
+    if (!giris) return alert(t("Lütfen giriş tarihini seçin."));
     cevap[a.id] = { giris, cikis }; ileri();
   });
 }
@@ -137,9 +137,9 @@ function sayac(a, ic) {
 function butce(a, ic) {
   const tip = cevap.tip ?? "satilik";
   const v = cevap[a.id] ?? { para: "TRY" };
-  const fmt = (x) => (x >= 1e6 ? `${(x / 1e6).toLocaleString("tr-TR")} milyon` : `${(x / 1e3).toLocaleString("tr-TR")} bin`);
+  const fmt = (x) => (x >= 1e6 ? `${(x / 1e6).toLocaleString(YEREL)} milyon` : `${(x / 1e3).toLocaleString(YEREL)} bin`);
   const araliklar = a.hazirAraliklar[tip] ?? [];
-  ic.innerHTML = `<p class="kucuk">Fiyat ${escape(a.birimEtiketi[tip])} olarak (TL)</p>
+  ic.innerHTML = `<p class="kucuk">${escape(t("Fiyat {birim} olarak (TL)", { birim: a.birimEtiketi[tip] }))}</p>
     <div class="secim-kartlari">${araliklar.map(([min, max], k) =>
       `<button type="button" class="secim-karti" data-k="${k}">${!min ? `${fmt(max)} altı` : !max ? `${fmt(min)} üstü` : `${fmt(min)} – ${fmt(max)}`}</button>`).join("")}</div>
     <details class="elle"><summary>Kendim yazayım</summary>
@@ -154,19 +154,19 @@ function butce(a, ic) {
   devamDugmesi(ic, () => {
     const min = Number(ic.querySelector("[name=min]").value) || undefined;
     const max = Number(ic.querySelector("[name=max]").value) || undefined;
-    if (!min && !max) return alert("Bir aralık seçin ya da tutar yazın.");
+    if (!min && !max) return alert(t("Bir aralık seçin ya da tutar yazın."));
     cevap[a.id] = { min, max, para: ic.querySelector("[name=para]").value }; ileri();
   });
 }
 
 function evetHayir(a, ic) {
-  ic.innerHTML = `<div class="secim-kartlari"><button type="button" class="secim-karti" data-v="1">Evet</button><button type="button" class="secim-karti" data-v="0">Hayır, hepsini göster</button></div>`;
+  ic.innerHTML = `<div class="secim-kartlari"><button type="button" class="secim-karti" data-v="1">${t("Evet")}</button><button type="button" class="secim-karti" data-v="0">${t("Hayır, hepsini göster")}</button></div>`;
   ic.querySelectorAll("[data-v]").forEach((b) => b.addEventListener("click", () => { cevap[a.id] = b.dataset.v === "1"; ileri(); }));
 }
 
 function devamDugmesi(ic, fn) {
   const b = document.createElement("button");
-  b.type = "button"; b.className = "dugme tam devam"; b.textContent = "Devam";
+  b.type = "button"; b.className = "dugme tam devam"; b.textContent = t("Devam");
   b.addEventListener("click", fn);
   ic.append(b);
 }
@@ -177,17 +177,17 @@ async function ozetCiz() {
   const f = filtreler();
   const satirlar = adimlar.map((a, i) => [a, i]).filter(([a, i]) => gorunur(i) && cevap[a.id] != null)
     .map(([a, i]) => `<li><button type="button" data-git="${i}"><span>${escape(a.soru)}</span><strong>${escape(ozetMetni(a))}</strong></button></li>`).join("");
-  govde.innerHTML = `<h2>Harika, aradığınız ev şöyle:</h2><ul class="ozet-liste">${satirlar}</ul><div class="sonuc-sayi">Sayılıyor…</div>`;
+  govde.innerHTML = `<h2>${t("Harika, aradığınız ev şöyle:")}</h2><ul class="ozet-liste">${satirlar}</ul><div class="sonuc-sayi">${t("Sayılıyor…")}</div>`;
   govde.querySelectorAll("[data-git]").forEach((b) => b.addEventListener("click", () => { yol.push(aktif); aktif = Number(b.dataset.git); ciz(); }));
   try {
     const { sayi, url } = await postJson("/api/sayim", f);
     postJson("/api/sihirbaz-oturum", { filtreler: f, tamamlandi: true, adim_sayisi: yol.length, sonuc_sayisi: sayi }).catch(() => {});
     const el = govde.querySelector(".sonuc-sayi");
     el.innerHTML = sayi > 0
-      ? `<a class="dugme tam buyuk" href="${escape(url)}">${sayi} ilanı göster</a>`
-      : `<p>Bu kriterlerle şu an ilan yok. Bütçeyi ya da bölgeyi değiştirmeyi deneyin.</p><a class="dugme ikincil" href="${escape(url)}">Yine de sonuçlara git</a>`;
+      ? `<a class="dugme tam buyuk" href="${escape(url)}">${t("{n} ilanı göster", { n: sayi })}</a>`
+      : `<p>${t("Bu kriterlerle şu an ilan yok. Bütçeyi ya da bölgeyi değiştirmeyi deneyin.")}</p><a class="dugme ikincil" href="${escape(url)}">${t("Yine de sonuçlara git")}</a>`;
   } catch {
-    govde.querySelector(".sonuc-sayi").innerHTML = `<a class="dugme tam" href="/ara">Sonuçlara git</a>`;
+    govde.querySelector(".sonuc-sayi").innerHTML = `<a class="dugme tam" href="/ara">${t("Sonuçlara git")}</a>`;
   }
 }
 
@@ -197,11 +197,11 @@ function ozetMetni(a) {
   if (a.tur === "tek_secim") return etiket(v);
   if (a.tur === "coklu_secim") {
     const liste = a.id === "bolge" ? [...(v.gruplar ?? []).map(etiket), ...(v.secili ?? []).map((s) => MAHALLELER.find((m) => m.slug === s)?.ad ?? s)] : v.map(etiket);
-    return liste.join(", ") || "Fark etmez";
+    return liste.join(", ") || t("Fark etmez");
   }
   if (a.tur === "tarih_araligi") return `${v.giris ?? "?"} → ${v.cikis ?? "?"}`;
-  if (a.tur === "butce") return `${v.min ? v.min.toLocaleString("tr-TR") : "0"} – ${v.max ? v.max.toLocaleString("tr-TR") : "∞"} ${v.para}`;
-  if (a.tur === "evet_hayir") return v ? "Evet" : "Hayır";
+  if (a.tur === "butce") return `${v.min ? v.min.toLocaleString(YEREL) : "0"} – ${v.max ? v.max.toLocaleString(YEREL) : "∞"} ${v.para}`;
+  if (a.tur === "evet_hayir") return v ? t("Evet") : t("Hayır");
   return String(v);
 }
 

@@ -1,5 +1,5 @@
 import { aramalar, aramaSil, favoriler } from "./kaydet.js";
-import { escape } from "./ortak.js";
+import { escape, t, YEREL } from "./ortak.js";
 
 const aramaEl = document.querySelector("[data-aramalar]");
 const ilanEl = document.querySelector("[data-ilanlar]");
@@ -9,9 +9,9 @@ function aramalariCiz() {
   const liste = aramalar();
   aramaEl.innerHTML = liste.length
     ? liste.map((a) => `<div class="kayitli-arama"><a href="${escape(a.url)}"><strong>${escape(a.ad)}</strong>
-        <span class="kucuk">${new Date(a.tarih).toLocaleDateString("tr-TR")}</span></a>
-        <button type="button" class="metin-dugme" data-sil="${escape(a.url)}">Sil</button></div>`).join("")
-    : `<p class="kucuk">Kayıtlı aramanız yok. Arama sonuçlarında "♡ Aramayı kaydet" ile kaydedebilirsiniz.</p>`;
+        <span class="kucuk">${new Date(a.tarih).toLocaleDateString(YEREL)}</span></a>
+        <button type="button" class="metin-dugme" data-sil="${escape(a.url)}">${t("Sil")}</button></div>`).join("")
+    : `<p class="kucuk">${t("Kayıtlı aramanız yok. Arama sonuçlarında \"♡ Aramayı kaydet\" ile kaydedebilirsiniz.")}</p>`;
   aramaEl.querySelectorAll("[data-sil]").forEach((b) => b.addEventListener("click", () => { aramaSil(b.dataset.sil); aramalariCiz(); }));
 }
 
