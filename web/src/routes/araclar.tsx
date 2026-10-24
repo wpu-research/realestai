@@ -5,6 +5,7 @@ import { sql } from "../db.js";
 import { KUR } from "../lib/arama.js";
 import { para } from "../lib/bicim.js";
 import { ESKI_GUN, gunOnce, krediOranlari } from "../lib/kredi-oran.js";
+import { formKaynagi } from "../lib/kaynak.js";
 import { json, Sayfa } from "../views/layout.js";
 
 // Emlak endeksi, kredi hesaplama, bana emlakçı bul, rehberler ve kaydedilenler.
@@ -227,9 +228,10 @@ araclar.post("/emlakci-bul", async (c) => {
   const b = await c.req.parseBody();
   const s = (k: string) => (typeof b[k] === "string" && (b[k] as string).trim() ? (b[k] as string).trim().slice(0, 2000) : null);
   if (!s("ad_soyad") || !s("telefon") || b.kvkk_onay !== "1") return c.text("Lütfen ad, telefon ve KVKK onayını doldurun.", 400);
-  await sql`insert into talepler (ad_soyad, telefon, eposta, mesaj, kvkk_onay, konu, ayrinti)
+  const k = formKaynagi(b);
+  await sql`insert into talepler (ad_soyad, telefon, eposta, mesaj, kvkk_onay, konu, ayrinti, dil, kaynak, kampanya)
             values (${s("ad_soyad")}, ${s("telefon")}, ${s("eposta")}, ${s("mesaj")}, true, 'emlakci_bul',
-                    ${sql.json({ istek: s("istek"), bolge: s("bolge"), butce: s("butce"), zaman: s("zaman") })})`;
+                    ${sql.json({ istek: s("istek"), bolge: s("bolge"), butce: s("butce"), zaman: s("zaman") })}, ${k.dil}, ${k.kaynak}, ${k.kampanya})`;
   return c.redirect("/emlakci-bul?ok=1");
 });
 
@@ -289,9 +291,10 @@ araclar.post("/ekspertiz", async (c) => {
   const s = (k: string) => (typeof b[k] === "string" && (b[k] as string).trim() ? (b[k] as string).trim().slice(0, 2000) : null);
   if (!s("ad_soyad") || !s("telefon") || b.kvkk_onay !== "1") return c.text("Lütfen ad, telefon ve KVKK onayını doldurun.", 400);
   const [ilan] = s("ilan_no") ? await sql`select id from ilanlar where ilan_no = ${Number(s("ilan_no"))}` : [];
-  await sql`insert into talepler (ilan_id, ad_soyad, telefon, eposta, mesaj, kvkk_onay, konu, ayrinti)
+  const k = formKaynagi(b);
+  await sql`insert into talepler (ilan_id, ad_soyad, telefon, eposta, mesaj, kvkk_onay, konu, ayrinti, dil, kaynak, kampanya)
             values (${ilan?.id ?? null}, ${s("ad_soyad")}, ${s("telefon")}, ${s("eposta")}, ${s("mesaj")}, true, 'ekspertiz',
-                    ${sql.json({ amac: s("amac"), mahalle: s("mahalle"), tur: s("tur"), m2: s("m2") })})`;
+                    ${sql.json({ amac: s("amac"), mahalle: s("mahalle"), tur: s("tur"), m2: s("m2") })}, ${k.dil}, ${k.kaynak}, ${k.kampanya})`;
   return c.redirect("/ekspertiz?ok=1");
 });
 

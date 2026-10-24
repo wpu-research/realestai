@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AVATAR_DIZIN, avatarAyar, fotoGosterilir, imzala, klonSesAcik } from "../lib/avatar.js";
 import { dil, istek, t } from "../lib/dil.js";
+import { formKaynagi } from "../lib/kaynak.js";
 import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
@@ -293,9 +294,10 @@ site.post("/ilan/:no{[0-9]+}/talep", async (c) => {
     return c.text("Lütfen ad, telefon veya e-posta girip KVKK onayını işaretleyin.", 400);
   }
   const s = (k: string) => (typeof b[k] === "string" && (b[k] as string).trim() ? (b[k] as string).trim().slice(0, 2000) : null);
-  await sql`insert into talepler (ilan_id, ad_soyad, telefon, eposta, mesaj, giris_tarihi, cikis_tarihi, kisi_sayisi, kvkk_onay)
+  const k = formKaynagi(b);
+  await sql`insert into talepler (ilan_id, ad_soyad, telefon, eposta, mesaj, giris_tarihi, cikis_tarihi, kisi_sayisi, kvkk_onay, dil, kaynak, kampanya)
             values (${i.id}, ${s("ad_soyad")}, ${s("telefon")}, ${s("eposta")}, ${s("mesaj")},
-                    ${s("giris_tarihi")}, ${s("cikis_tarihi")}, ${s("kisi_sayisi") ? Number(s("kisi_sayisi")) : null}, true)`;
+                    ${s("giris_tarihi")}, ${s("cikis_tarihi")}, ${s("kisi_sayisi") ? Number(s("kisi_sayisi")) : null}, true, ${k.dil}, ${k.kaynak}, ${k.kampanya})`;
   return c.redirect(`/ilan/${no}?talep=ok`);
 });
 
@@ -368,9 +370,10 @@ site.post("/evimi-listele", async (c) => {
   if (!s("ad_soyad") || !s("telefon") || b.kvkk_onay !== "1" || !["satilik", "kiralik", "sezonluk", "gunluk"].includes(tip ?? "")) {
     return c.text("Lütfen ad, telefon ve KVKK onayını doldurun.", 400);
   }
-  await sql`insert into basvurular (ad_soyad, telefon, eposta, tip, mahalle_id, emlak_turu, mesaj, kvkk_onay, iys_onay)
+  const k = formKaynagi(b);
+  await sql`insert into basvurular (ad_soyad, telefon, eposta, tip, mahalle_id, emlak_turu, mesaj, kvkk_onay, iys_onay, dil, kaynak, kampanya)
             values (${s("ad_soyad")}, ${s("telefon")}, ${s("eposta")}, ${tip}, ${s("mahalle_id") ? Number(s("mahalle_id")) : null},
-                    ${s("emlak_turu")}, ${s("mesaj")}, true, ${b.iys_onay === "1"})`;
+                    ${s("emlak_turu")}, ${s("mesaj")}, true, ${b.iys_onay === "1"}, ${k.dil}, ${k.kaynak}, ${k.kampanya})`;
   return c.redirect("/evimi-listele?ok=1");
 });
 
@@ -448,7 +451,7 @@ site.get("/asistan", async (c) => {
 // ---------- Yasal (taslak) ----------
 export const YASAL: Record<string, [string, string]> = {
   kvkk: ["KVKK Aydınlatma Metni", "Veri sorumlusu: [ŞİRKET UNVANI]. Başvuru ve talep formlarında verdiğiniz ad, telefon ve e-posta bilgileri yalnız talebinizi yanıtlamak ve ilan hizmetini sunmak amacıyla işlenir; yurt içinde barındırma hizmeti sağlayıcılarına ve yazılı açık rızanızla yurt dışındaki hizmet sağlayıcılara aktarılabilir. Verileriniz amaç için gerekli süre boyunca saklanır. KVKK m.11 kapsamındaki haklarınız için [e-posta] adresine başvurabilirsiniz."],
-  cerez: ["Çerez Politikası", "Bu site yalnız oturum için zorunlu çerez kullanır. Analitik veya reklam çerezi kullanılmaz."],
+  cerez: ["Çerez Politikası", "Bu site analitik veya reklam çerezi kullanmaz. Kullanılanlar: seçtiğiniz dili hatırlayan \"dil\" çerezi (1 yıl) ve yalnız ekip girişinde kullanılan oturum çerezi. Ayrıca tarayıcınızın kendi depolamasında, sunucuya gönderilmeden, kaydettiğiniz ilanlar ve aramalar, para birimi seçiminiz ve bu bildirimi kapattığınız bilgisi tutulur. Siteye hangi bağlantıdan geldiğiniz (ör. bir reklam kampanyası) tarayıcıyı kapatınca silinen oturum depolamasında tutulur ve yalnız bir formu gönderirseniz onunla birlikte iletilir; sizi tanımlayan bilgi içermez. Bu bilgileri tarayıcı ayarlarınızdan silebilirsiniz."],
   "acik-riza": ["Açık Rıza Metni", "[ŞİRKET UNVANI] tarafından, talebimi yanıtlamak ve ilan hizmetinin sunulması amacıyla, yurt dışındaki hizmet sağlayıcılara aktarım dahil kişisel verilerimin işlenmesine açık rıza veriyorum. Rızamı dilediğim zaman [e-posta] adresine yazarak geri alabilirim."],
   iys: ["Ticari Elektronik İleti Onay Metni", "[ŞİRKET UNVANI] tarafından kampanya, yeni ilan ve bilgilendirme amaçlı ticari elektronik iletilerin (SMS, e-posta, arama) tarafıma gönderilmesine onay veriyorum. Onayımı İleti Yönetim Sistemi (İYS) üzerinden ya da [e-posta] adresine yazarak dilediğim zaman geri alabilirim."],
   kullanim: ["Kullanım Koşulları", "İlan bilgileri ev sahiplerinin beyanına dayanır. Yapay zekâ ile üretilen içerikler (çeviriler, temsili görseller, asistan yanıtları) bilgi amaçlıdır; karar vermeden önce mülkü yerinde görün ve tapu kaydını kontrol edin."],

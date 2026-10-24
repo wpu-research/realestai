@@ -43,3 +43,30 @@ document.querySelector("[data-dil]")?.addEventListener("change", (e) => {
   u.searchParams.set("dil", e.target.value);
   location.href = u.toString();
 });
+
+// ---------- Kanal (reklam testi) ----------
+// utm_source/utm_campaign ya da yönlendiren site oturum boyunca tutulur (sessionStorage, tarayıcı kapanınca silinir);
+// yalnız ziyaretçi bir form gönderirse onunla birlikte iletilir. Kişiyi tanımlayan bilgi içermez.
+(() => {
+  let kanal = null;
+  try { kanal = JSON.parse(sessionStorage.getItem("kanal") || "null"); } catch {}
+  const q = new URLSearchParams(location.search);
+  if (q.get("utm_source")) {
+    kanal = { kaynak: q.get("utm_source"), kampanya: q.get("utm_campaign") || "" };
+  } else if (!kanal && document.referrer) {
+    try {
+      const h = new URL(document.referrer).hostname.replace(/^www\./, "");
+      if (h && h !== location.hostname.replace(/^www\./, "")) kanal = { kaynak: h, kampanya: "" };
+    } catch {}
+  }
+  if (!kanal) kanal = { kaynak: "dogrudan", kampanya: "" };
+  try { sessionStorage.setItem("kanal", JSON.stringify(kanal)); } catch {}
+  document.querySelectorAll("[data-kvkk-form]").forEach((f) => {
+    for (const [ad, deger] of Object.entries(kanal)) {
+      if (!deger || f.elements[ad]) continue;
+      const g = document.createElement("input");
+      Object.assign(g, { type: "hidden", name: ad, value: deger });
+      f.append(g);
+    }
+  });
+})();

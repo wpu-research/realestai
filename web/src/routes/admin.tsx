@@ -819,7 +819,7 @@ admin.get("/basvurular", async (c) => {
         {liste.map((b) => (
           <div class="kutu-panel">
             <div class="baslik-satir"><strong>{b.ad_soyad}</strong><span class="durum">{b.durum}</span></div>
-            <p><a href={`tel:${b.telefon}`}>{b.telefon}</a>{b.eposta && ` · ${b.eposta}`} · {TIP_ETIKET[b.tip]} · {b.mahalle ?? "—"} · {tarih(b.created_at)}{b.iys_onay && " · İYS ✓"}</p>
+            <p><a href={`tel:${b.telefon}`}>{b.telefon}</a>{b.eposta && ` · ${b.eposta}`} · {TIP_ETIKET[b.tip]} · {b.mahalle ?? "—"} · {tarih(b.created_at)}{b.iys_onay && " · İYS ✓"}{b.dil !== "tr" && <> · <span class="etiket mavi">{DIL_ADI[b.dil] ?? b.dil}</span></>}{b.kaynak && ` · kaynak: ${b.kaynak}`}</p>
             {b.mesaj && <p class="not">{b.mesaj}</p>}
             <form method="post" action={`/admin/basvuru/${b.id}`} class="satir-form">
               <select name="durum">{["yeni", "arandi", "ilgileniyor", "sozlesme", "yayinda", "reddetti"].map((d) => <option selected={b.durum === d}>{d}</option>)}</select>
@@ -860,7 +860,7 @@ admin.get("/talepler", async (c) => {
         {liste.map((t) => (
           <div class="kutu-panel">
             <div class="baslik-satir"><strong>{t.ad_soyad}</strong><span class="durum">{t.durum}</span></div>
-            <p>{t.telefon && <a href={`tel:${t.telefon}`}>{t.telefon}</a>}{t.eposta && ` · ${t.eposta}`} · {tarih(t.created_at)}</p>
+            <p>{t.telefon && <a href={`tel:${t.telefon}`}>{t.telefon}</a>}{t.eposta && ` · ${t.eposta}`} · {tarih(t.created_at)}{t.dil !== "tr" && <> · <span class="etiket mavi">{DIL_ADI[t.dil] ?? t.dil}</span></>}{t.kaynak && ` · kaynak: ${t.kaynak}`}</p>
             {t.ilan_no && <p>İlan: <a href={`/ilan/${t.ilan_no}`} target="_blank">#{t.ilan_no} {t.baslik}</a></p>}
             {t.konu === "emlakci_bul" && <p><span class="etiket mavi">Bana emlakçı bul</span> {[t.ayrinti?.istek, t.ayrinti?.bolge, t.ayrinti?.butce, t.ayrinti?.zaman].filter(Boolean).join(" · ")}</p>}
             {t.konu === "ekspertiz" && <p><span class="etiket mavi">Ekspertiz</span> {[t.ayrinti?.amac, t.ayrinti?.mahalle, t.ayrinti?.tur, t.ayrinti?.m2 && `${t.ayrinti.m2} m²`].filter(Boolean).join(" · ")}</p>}
@@ -884,22 +884,107 @@ admin.post("/talep/:id", async (c) => {
 });
 
 // ================= ÖLÇÜM =================
+const DONEMLER: Record<string, [string, string]> = { "30": ["Son 30 gün", "30 days"], "90": ["Son 90 gün", "90 days"], tumu: ["Tümü", "100 years"] };
+const oran = (pay: number, payda: number) => (payda ? `%${Math.round((pay / payda) * 100)}` : "—");
+
 admin.get("/olcum", async (c) => {
-  const [aramalar, oturumlar] = await Promise.all([
+  const donem = DONEMLER[c.req.query("donem") ?? ""] ? c.req.query("donem")! : "30";
+  const aralik = DONEMLER[donem][1];
+  const [aramalar, oturumlar, [huni], basvuru, kanallar, ekip] = await Promise.all([
     sql`select metin, filtreler, created_at from sesli_arama_kayitlari order by created_at desc limit 200`,
     sql<{ kanal: string; toplam: number; biten: number; ort_adim: number }[]>`
       select kanal, count(*)::int as toplam, count(*) filter (where tamamlandi)::int as biten,
              round(avg(adim_sayisi), 1)::float as ort_adim
-      from asistan_oturumlari where created_at > now() - interval '30 days' group by kanal`,
+      from asistan_oturumlari where created_at > now() - ${aralik}::interval group by kanal`,
+    // Sahip hunisi: dönemde eklenen adaylar ne kadar ilerledi (durum elle de değişebildiği için güncel durum da sayılır).
+    sql`with g as (select aday_id, array_agg(sonuc) as s from arama_gecmisi group by aday_id)
+      select count(*)::int as aday,
+        count(*) filter (where g.s is not null or a.durum not in ('yeni', 'aranacak'))::int as aranan,
+        count(*) filter (where g.s && array['geri_aranacak','ilgileniyor','onaylandi','reddetti','emlakci_cikti']::aday_durum[]
+                          or a.durum in ('geri_aranacak','ilgileniyor','onaylandi','reddetti','emlakci_cikti'))::int as ulasilan,
+        count(*) filter (where g.s && array['ilgileniyor','onaylandi']::aday_durum[] or a.durum in ('ilgileniyor','onaylandi'))::int as ilgilenen,
+        count(*) filter (where 'onaylandi' = any(g.s) or a.durum = 'onaylandi' or a.ilan_id is not null)::int as onaylayan,
+        count(*) filter (where i.yayinlandi_at is not null)::int as yayinlanan,
+        count(*) filter (where a.durum = 'emlakci_cikti')::int as emlakci
+      from adaylar a left join g on g.aday_id = a.id left join ilanlar i on i.id = a.ilan_id
+      where a.created_at > now() - ${aralik}::interval`,
+    sql<{ durum: string; adet: number }[]>`select durum, count(*)::int as adet from basvurular
+      where created_at > now() - ${aralik}::interval group by durum`,
+    // Kanal: reklam testi için talep ve başvuruların kaynağı; "ilerleyen" = gösterim/teklif/kapanış ya da sözleşme/yayın.
+    sql<{ kaynak: string; kampanya: string; talep: number; basvuru: number; ilerleyen: number }[]>`
+      with t as (
+        select coalesce(kaynak, 'bilinmiyor') as kaynak, coalesce(kampanya, '') as kampanya, 1 as talep, 0 as basvuru,
+               (durum in ('gosterim','teklif','kapandi'))::int as ilerleyen from talepler where created_at > now() - ${aralik}::interval
+        union all
+        select coalesce(kaynak, 'bilinmiyor'), coalesce(kampanya, ''), 0, 1, (durum in ('sozlesme','yayinda'))::int
+        from basvurular where created_at > now() - ${aralik}::interval)
+      select kaynak, kampanya, sum(talep)::int as talep, sum(basvuru)::int as basvuru, sum(ilerleyen)::int as ilerleyen
+      from t group by kaynak, kampanya order by sum(talep) + sum(basvuru) desc`,
+    sql<{ ad: string; arama: number; ulasilan: number; onay: number }[]>`
+      select k.ad, count(*)::int as arama,
+        count(*) filter (where g.sonuc not in ('ulasilamadi','aranacak','yeni'))::int as ulasilan,
+        count(*) filter (where g.sonuc = 'onaylandi')::int as onay
+      from arama_gecmisi g join kullanicilar k on k.id = g.arayan
+      where g.created_at > now() - ${aralik}::interval group by k.ad order by arama desc`,
   ]);
+  const adimlar: [string, number][] = [
+    ["Radara eklenen aday", huni.aday], ["Arandı", huni.aranan], ["Ulaşıldı", huni.ulasilan],
+    ["İlgilendi", huni.ilgilenen], ["Onayladı (yetki + KVKK)", huni.onaylayan], ["Yayına çıktı", huni.yayinlanan],
+  ];
+  const basvuruAdet = (d: string) => basvuru.find((x) => x.durum === d)?.adet ?? 0;
+  const basvuruToplam = basvuru.reduce((t, x) => t + x.adet, 0);
   return c.html(
     <AdminSayfa baslik="Ölçüm" kullanici={c.get("kullanici")}>
-      <h1>Ölçüm (son 30 gün)</h1>
+      <h1>Ölçüm</h1>
+      <nav class="sekmeler">
+        {Object.entries(DONEMLER).map(([k, [et]]) => <a href={`/admin/olcum?donem=${k}`} class={k === donem ? "aktif" : ""}>{et}</a>)}
+      </nav>
+
+      <h2>Sahip hunisi</h2>
+      <p class="kucuk">Bu dönemde radara eklenen adayların bugüne kadar nereye ilerlediği. Plan hedefi: ulaşılanların en az %10'u onaylasın.</p>
+      <div class="tablo-kap"><table class="tablo huni">
+        <thead><tr><th>Adım</th><th>Adet</th><th>Bir önceki adıma göre</th><th>Adaylara göre</th></tr></thead>
+        <tbody>{adimlar.map(([ad, n], k) => (
+          <tr><td>{ad}</td><td><strong>{n}</strong></td><td>{k ? oran(n, adimlar[k - 1][1]) : ""}</td><td>{k ? oran(n, huni.aday) : ""}</td></tr>
+        ))}</tbody>
+      </table></div>
+      <p class="kucuk">
+        Onay oranı (ulaşılanlara göre): <strong>{oran(huni.onaylayan, huni.ulasilan)}</strong> ·
+        Emlakçı çıkan: {huni.emlakci} ({oran(huni.emlakci, huni.ulasilan)} — yüksekse radarın "sahibinden" tahmini gözden geçirilmeli)
+      </p>
+
+      <h2>Evini listelemek isteyen başvurular</h2>
+      <p class="kucuk">
+        {basvuruToplam} başvuru · arandı {basvuruAdet("arandi")} · ilgileniyor {basvuruAdet("ilgileniyor")} · sözleşme {basvuruAdet("sozlesme")} ·
+        yayında {basvuruAdet("yayinda")} · reddetti {basvuruAdet("reddetti")} · bekleyen {basvuruAdet("yeni")}
+      </p>
+
+      <h2>Kanallar</h2>
+      <p class="kucuk">
+        Talep ve başvuruların nereden geldiği. Reklam bağlantılarına <code>?utm_source=instagram&amp;utm_campaign=bitez-ekim</code> gibi ekler koyun;
+        reklam harcamasını talep sayısına bölerek talep başı maliyeti bulun. "dogrudan": adresi yazarak gelen; "bilinmiyor": bu ölçüm başlamadan önceki kayıtlar.
+      </p>
+      <div class="tablo-kap"><table class="tablo">
+        <thead><tr><th>Kaynak</th><th>Kampanya</th><th>Talep</th><th>Başvuru</th><th>İlerleyen</th></tr></thead>
+        <tbody>{kanallar.length ? kanallar.map((k) => (
+          <tr><td>{k.kaynak}</td><td>{k.kampanya || "—"}</td><td>{k.talep}</td><td>{k.basvuru}</td><td>{k.ilerleyen} ({oran(k.ilerleyen, k.talep + k.basvuru)})</td></tr>
+        )) : <tr><td colspan={5}>Bu dönemde talep ya da başvuru yok.</td></tr>}</tbody>
+      </table></div>
+
+      <h2>Ekip aramaları</h2>
+      <div class="tablo-kap"><table class="tablo">
+        <thead><tr><th>Arayan</th><th>Arama</th><th>Ulaşılan</th><th>Onay</th></tr></thead>
+        <tbody>{ekip.length ? ekip.map((e) => (
+          <tr><td>{e.ad}</td><td>{e.arama}</td><td>{e.ulasilan} ({oran(e.ulasilan, e.arama)})</td><td>{e.onay}</td></tr>
+        )) : <tr><td colspan={4}>Bu dönemde kayıtlı arama yok.</td></tr>}</tbody>
+      </table></div>
+
+      <h2>Asistan ve sihirbaz</h2>
       <div class="kartlar-liste yatay">
-        {oturumlar.map((o) => (
+        {oturumlar.length ? oturumlar.map((o) => (
           <div class="kutu-panel"><strong>{o.kanal === "avatar" ? "Didem asistanı" : "Sihirbaz"}</strong>
             <p>{o.toplam} başladı · {o.biten} bitirdi · ortalama {o.ort_adim} adım</p></div>
-        ))}
+        )) : <p class="kucuk">Bu dönemde oturum yok.</p>}
       </div>
       <h2>Son sesli / yazılı aramalar</h2>
       <div class="tablo-kap">
@@ -1239,6 +1324,9 @@ admin.post("/3d/:gid/sil", async (c) => {
   await unlink(join(UPLOAD_DIZIN, g.dosya_url.replace(/^\/uploads\//, ""))).catch(() => {});
   return c.redirect(`/admin/ilan/${g.ilan_id}`);
 });
+
+// Yabancı müşteriye kendi dilinde dönülsün diye listede gösterilir.
+const DIL_ADI: Record<string, string> = { en: "İngilizce", ru: "Rusça", de: "Almanca" };
 
 // ================= YAYINA HAZIRLIK (yalnız admin) =================
 admin.use("/yayin", async (c, next) => (c.get("kullanici").rol === "admin" ? next() : c.text("Yetkiniz yok", 403)));
