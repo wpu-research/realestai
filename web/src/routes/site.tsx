@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { demoKosulu, siteAyar, yerTutucu } from "../lib/site-ayar.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AVATAR_DIZIN, avatarAyar, fotoGosterilir, imzala, klonSesAcik } from "../lib/avatar.js";
@@ -42,7 +43,7 @@ site.get("/", async (c) => {
   const [firsatlar, mh] = await Promise.all([
     ilanAra({ siralama: "en_firsat" }, { limit: 6 }) as Promise<IlanKart[]>,
     sql<(Mahalle & { n: number })[]>`
-      select m.slug, m.ad, m.ilce, count(i.id) filter (where i.durum = 'yayinda')::int as n
+      select m.slug, m.ad, m.ilce, count(i.id) filter (where i.durum = 'yayinda' ${demoKosulu()})::int as n
       from mahalleler m left join ilanlar i on i.mahalle_id = m.id group by m.id order by m.ad`,
   ]);
   return c.html(
@@ -104,7 +105,7 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
   const [i] = await sql`
     select i.*, m.ad as mahalle, m.slug as mahalle_slug, m.ilce, coalesce(i.lat, m.lat) as harita_lat, coalesce(i.lng, m.lng) as harita_lng
     from ilanlar i left join mahalleler m on m.id = i.mahalle_id
-    where i.ilan_no = ${no} and i.durum = 'yayinda'`;
+    where i.ilan_no = ${no} and i.durum = 'yayinda' ${demoKosulu()}`;
   if (!i) return c.notFound();
   let fotolar = await sql<{ url: string; oda_etiketi: string | null }[]>`
     select url, oda_etiketi from ilan_fotolari where ilan_id = ${i.id} order by sira`;
@@ -273,7 +274,7 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
 site.post("/ilan/:no{[0-9]+}/talep", async (c) => {
   const no = Number(c.req.param("no"));
   const b = await c.req.parseBody();
-  const [i] = await sql`select id from ilanlar where ilan_no = ${no} and durum = 'yayinda'`;
+  const [i] = await sql`select i.id from ilanlar i where i.ilan_no = ${no} and i.durum = 'yayinda' ${demoKosulu()}`;
   if (!i || b.kvkk_onay !== "1" || !b.ad_soyad || !(b.telefon || b.eposta)) {
     return c.text("Lütfen ad, telefon veya e-posta girip KVKK onayını işaretleyin.", 400);
   }
@@ -445,9 +446,13 @@ site.get("/yasal/:sayfa", (c) => {
     <Sayfa baslik={t(s[0])}>
       <div class="kap dar bolum">
         {dil() !== "tr" && <div class="bilgi">{t("Bu sayfa şimdilik yalnızca Türkçe.")}</div>}
-        <div class="uyari">{t("TASLAK — hukuki inceleme bekliyor")}</div>
+        {!siteAyar().hukuk_onayli && <div class="uyari">{t("TASLAK — hukuki inceleme bekliyor")}</div>}
         <h1>{t(s[0])}</h1>
-        <p>{s[1]}</p>
+        <p>{yerTutucu(s[1])}</p>
+        {siteAyar().unvan && (
+          <p class="kucuk">{siteAyar().unvan}{siteAyar().adres && <> · {siteAyar().adres}</>}{siteAyar().mersis && <> · MERSİS {siteAyar().mersis}</>}
+            {siteAyar().kep && <> · KEP {siteAyar().kep}</>}</p>
+        )}
       </div>
     </Sayfa>,
   );

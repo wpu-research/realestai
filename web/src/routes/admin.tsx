@@ -16,6 +16,7 @@ import {
   AVATAR_DIZIN, avatarAyar, avatarAyarKaydet, klonSesAcik, rizaGecerli, rizayiGeriAl, SesHatasi, sesAnahtarlariVar, sesUret,
 } from "../lib/avatar.js";
 import { KAYIT_BOLUMLERI, KAYIT_KURALLARI } from "../lib/kayit-metni.js";
+import { SIRKET_ZORUNLU, siteAyar, siteAyarKaydet, type SiteAyar } from "../lib/site-ayar.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_ANAHTARLARI, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 import {
   ADAY_DURUM_ETIKET, BAYRAK_ETIKET, fiyatMetni, ODA_ETIKET, para, tarih, TIP_ETIKET, TUR_ETIKET, yuzde,
@@ -76,6 +77,7 @@ function AdminSayfa({ baslik, children, menu = true, kullanici, scriptler = [] }
               <a href="/admin/olcum">Ölçüm</a>
               <a href="/admin/eklenti">Radar eklentisi</a>
               {kullanici?.rol === "admin" && <a href="/admin/avatar">Avatar</a>}
+              {kullanici?.rol === "admin" && <a href="/admin/yayin">Yayına hazırlık</a>}
               {kullanici?.rol === "admin" && <a href="/admin/kullanicilar">Kullanıcılar</a>}
             </nav>
             <form method="post" action="/admin/cikis" class="cikis"><span>{kullanici?.ad}</span><button>Çıkış</button></form>
@@ -1234,4 +1236,78 @@ admin.post("/3d/:gid/sil", async (c) => {
   if (!g) return c.notFound();
   await unlink(join(UPLOAD_DIZIN, g.dosya_url.replace(/^\/uploads\//, ""))).catch(() => {});
   return c.redirect(`/admin/ilan/${g.ilan_id}`);
+});
+
+// ================= YAYINA HAZIRLIK (yalnız admin) =================
+admin.use("/yayin", async (c, next) => (c.get("kullanici").rol === "admin" ? next() : c.text("Yetkiniz yok", 403)));
+
+const SIRKET_ALANLARI: [keyof SiteAyar, string, string?][] = [
+  ["unvan", "Şirket unvanı"], ["adres", "Adres"], ["mersis", "MERSİS no"], ["vergi", "Vergi dairesi / no"],
+  ["yetki_belgesi_no", "Taşınmaz Ticareti Yetki Belgesi no"], ["telefon", "Telefon"], ["eposta", "E-posta (KVKK başvuruları da buraya)"],
+  ["kep", "KEP adresi"], ["whatsapp", "WhatsApp numarası"], ["instagram", "Instagram bağlantısı", "https://instagram.com/…"],
+  ["facebook", "Facebook bağlantısı", "https://facebook.com/…"],
+];
+
+admin.get("/yayin", async (c) => {
+  const a = siteAyar();
+  const [[{ gercek, demo }], [{ anahtar }], avatar] = await Promise.all([
+    sql`select count(*) filter (where not demo)::int as gercek, count(*) filter (where demo)::int as demo from ilanlar where durum = 'yayinda'`,
+    sql`select count(*)::int as anahtar from eklenti_anahtarlari where iptal_at is null`,
+    avatarAyar(),
+  ]);
+  const host = c.req.header("host") ?? "";
+  const eksikSirket = SIRKET_ZORUNLU.filter((k) => !a[k]);
+  const kritik: [boolean, string][] = [
+    [!eksikSirket.length, eksikSirket.length ? `Şirket bilgileri eksik: ${eksikSirket.join(", ")}` : "Şirket bilgileri tamam (alt bilgi ve yasal metinlerde görünüyor)"],
+    [a.hukuk_onayli, a.hukuk_onayli ? "Yasal metinler avukat onaylı" : "Yasal metinler avukata gösterilmedi (sitede TASLAK uyarısı var)"],
+    [!!process.env.ANTHROPIC_API_KEY, process.env.ANTHROPIC_API_KEY ? "Claude bağlı (sesli arama, asistan, çeviri)" : "ANTHROPIC_API_KEY yok — sesli arama, asistan ve çeviri çalışmıyor"],
+    [gercek > 0, `Yayında gerçek ilan: ${gercek}`],
+    [a.demo_gizle || demo === 0, a.demo_gizle ? "DEMO ilanlar gizli" : `${demo} DEMO ilan sitede görünüyor`],
+    [!/\.up\.railway\.app$|^localhost/.test(host), `Alan adı: ${host}${/\.up\.railway\.app$/.test(host) ? " (Railway'in geçici adresi)" : ""}`],
+  ];
+  const istege: [boolean, string][] = [
+    [!!process.env.NVIDIA_API_KEY, process.env.NVIDIA_API_KEY ? "NVIDIA bağlı (fotoğraf oda etiketi)" : "NVIDIA_API_KEY yok — fotoğraf etiketleri elle"],
+    [klonSesAcik(avatar), klonSesAcik(avatar) ? "Didem'in klon sesi açık" : "Avatar: tarayıcı sesi (rıza ve ElevenLabs bekliyor)"],
+    [anahtar > 0, `Radar eklentisi: ${anahtar} etkin anahtar`],
+  ];
+  const satir = ([tamam, metin]: [boolean, string]) => <li class={tamam ? "tamam" : "eksik"}>{tamam ? "✓" : "✗"} {metin}</li>;
+  return c.html(
+    <AdminSayfa baslik="Yayına hazırlık" kullanici={c.get("kullanici")}>
+      <h1>Yayına hazırlık</h1>
+      {c.req.query("ok") && <div class="basari">Kaydedildi.</div>}
+      <div class="kutu-panel">
+        <h2>Kontrol listesi</h2>
+        <p class="kucuk">Kritik</p>
+        <ul class="kontrol">{kritik.map(satir)}</ul>
+        <p class="kucuk">İsteğe bağlı</p>
+        <ul class="kontrol">{istege.map(satir)}</ul>
+      </div>
+      <form method="post" action="/admin/yayin" class="kutu-panel form">
+        <h2>Şirket bilgileri</h2>
+        <p class="kucuk">Sitenin alt bilgisinde ve yasal metinlerde kullanılır. Boş bırakılan alan sitede gösterilmez.</p>
+        {SIRKET_ALANLARI.map(([k, et, ph]) => <label>{et}<input name={k} value={String(a[k] ?? "")} placeholder={ph ?? ""} /></label>)}
+        <h2>Yayın</h2>
+        <label class="kutu"><input type="checkbox" name="demo_gizle" value="1" checked={a.demo_gizle} /> DEMO ilanları sitede gizle (silinmez; arama, ana sayfa, endeks ve mahalle sayılarından çıkar)</label>
+        <label class="kutu"><input type="checkbox" name="hukuk_onayli" value="1" checked={a.hukuk_onayli} /> Yasal metinler avukat tarafından onaylandı ("TASLAK" uyarısını kaldır)</label>
+        <button class="dugme">Kaydet</button>
+      </form>
+      <div class="kutu-panel">
+        <h2>Alan adı bağlama</h2>
+        <ol>
+          <li>Railway → realestai → web → Settings → Networking → <b>Custom Domain</b> ile alan adını ekleyin (ör. <code>www.alanadi.com</code>).</li>
+          <li>Railway'in verdiği CNAME kaydını alan adı sağlayıcınızın DNS ayarlarına girin.</li>
+          <li>Sertifika Railway tarafından otomatik verilir; birkaç dakika sürebilir. Sonra bu sayfayı yeni adresten açın.</li>
+          <li>Radar eklentisini kullananlar eklentinin Ayarlar'ından sunucu adresini yeni alan adıyla değiştirsin.</li>
+        </ol>
+      </div>
+    </AdminSayfa>,
+  );
+});
+admin.post("/yayin", async (c) => {
+  const b = await c.req.parseBody();
+  const yeni: Partial<SiteAyar> = { demo_gizle: b.demo_gizle === "1", hukuk_onayli: b.hukuk_onayli === "1" };
+  for (const [k] of SIRKET_ALANLARI) (yeni as Record<string, string>)[k] = (s(b, k) ?? "").slice(0, 300);
+  for (const k of ["instagram", "facebook"] as const) if (yeni[k] && !/^https:\/\//.test(yeni[k]!)) yeni[k] = "";
+  await siteAyarKaydet(yeni);
+  return c.redirect("/admin/yayin?ok=1");
 });

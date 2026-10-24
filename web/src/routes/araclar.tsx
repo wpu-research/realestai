@@ -1,3 +1,4 @@
+import { demoKosulu } from "../lib/site-ayar.js";
 import { Hono } from "hono";
 import { dil, t } from "../lib/dil.js";
 import { sql } from "../db.js";
@@ -37,7 +38,7 @@ araclar.get("/endeks", async (c) => {
   const satirlar = await sql<EndeksSatiri[]>`
     with gozlem as (
       select i.mahalle_id, i.tip::text as tip, i.fiyat * ${tlCarpani} / nullif(i.net_m2, 0) as birim, i.yayinlandi_at as zaman
-      from ilanlar i where i.durum = 'yayinda' and i.tip in ('satilik', 'kiralik') and i.net_m2 > 0
+      from ilanlar i where i.durum = 'yayinda' ${demoKosulu()} and i.tip in ('satilik', 'kiralik') and i.net_m2 > 0
       union all
       select a.mahalle_id, a.tip::text, a.fiyat * ${tlCarpani} / nullif(a.net_m2, 0), a.created_at
       from adaylar a where a.tip in ('satilik', 'kiralik') and a.net_m2 > 0 and a.fiyat > 0 and a.durum <> 'emlakci_cikti'
@@ -192,7 +193,7 @@ araclar.get("/ekspertiz", async (c) => {
   const ok = c.req.query("ok") === "1";
   const ilanNo = Number(c.req.query("ilan")) || null;
   const [ilan] = ilanNo ? await sql`select i.ilan_no, i.baslik, m.ad as mahalle from ilanlar i left join mahalleler m on m.id = i.mahalle_id
-                                   where i.ilan_no = ${ilanNo} and i.durum = 'yayinda'` : [];
+                                   where i.ilan_no = ${ilanNo} and i.durum = 'yayinda' ${demoKosulu()}` : [];
   const mh = await sql<{ ad: string }[]>`select ad from mahalleler order by ad`;
   return c.html(
     <Sayfa baslik={t("Gayrimenkul ekspertizi")} scriptler={["/js/form.js"]}>

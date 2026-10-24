@@ -4,6 +4,7 @@ import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SITE_ADI } from "../config.js";
+import { siteAyar } from "../lib/site-ayar.js";
 import { KUR, type IlanKart } from "../lib/arama.js";
 import { para, TIP_ETIKET } from "../lib/bicim.js";
 import { Alan, Kisi, Menu, Yatak } from "./ikon.js";
@@ -21,6 +22,7 @@ type SayfaProps = {
 const KALP = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z";
 
 export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: SayfaProps) {
+  const a = siteAyar();
   return (
     <html lang={dil()} data-ses-dili={SES_DILI[dil()]}>
       <head>
@@ -63,7 +65,8 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: Sa
             <div>
               <a href="/" class="logo">{SITE_ADI}</a>
               <p>Bodrum · Milas · Didim</p>
-              <p class="kucuk">{t("Taşınmaz Ticareti Yetki Belgesi No")}: [doldurulacak]</p>
+              {a.yetki_belgesi_no && <p class="kucuk">{t("Taşınmaz Ticareti Yetki Belgesi No")}: {a.yetki_belgesi_no}</p>}
+              {a.unvan && <p class="kucuk">{a.unvan}{a.mersis && <> · MERSİS {a.mersis}</>}</p>}
               <p class="alt-araclar">
                 <a href="/endeks">{t("Emlak endeksi")}</a> · <a href="/kredi">{t("Kredi hesapla")}</a> · <a href="/emlakci-bul">{t("Bana emlakçı bul")}</a> · <a href="/ekspertiz">{t("Ekspertiz")}</a> ·{" "}
                 <a href="/rehber/alirken">{t("Alırken")}</a> · <a href="/rehber/satarken">{t("Satarken")}</a> · <a href="/rehber/kiralarken">{t("Kiralarken")}</a> ·{" "}
@@ -80,9 +83,12 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: Sa
             </div>
             <div class="alt-sutun">
               <strong>{t("İletişim")}</strong>
-              <span>[{t("telefon")} — doldurulacak]</span>
-              <span>[{t("e-posta")} — doldurulacak]</span>
-              <span>Instagram · Facebook · WhatsApp</span>
+              {a.telefon && <a href={`tel:${a.telefon.replace(/[^\d+]/g, "")}`}>{a.telefon}</a>}
+              {a.eposta && <a href={`mailto:${a.eposta}`}>{a.eposta}</a>}
+              {a.adres && <span>{a.adres}</span>}
+              {a.whatsapp && <a href={`https://wa.me/${a.whatsapp.replace(/\D/g, "")}`} rel="noopener">WhatsApp</a>}
+              {a.instagram && <a href={a.instagram} rel="noopener">Instagram</a>}
+              {a.facebook && <a href={a.facebook} rel="noopener">Facebook</a>}
             </div>
           </div>
         </footer>

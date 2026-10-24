@@ -1,3 +1,4 @@
+import { demoKosulu } from "./site-ayar.js";
 import { sql } from "../db.js";
 import { BINA_YASI, BULUNDUGU_KAT, KAT_SAYISI } from "./ozellikler.js";
 
@@ -153,7 +154,7 @@ export async function ilanAra(f: Filtreler, opt: { limit?: number; sayim?: boole
   const banyo = (f.banyo ?? []).map(Number).filter(Boolean);
 
   const kosul = sql`
-    i.durum = 'yayinda'
+    i.durum = 'yayinda' ${demoKosulu()}
     ${f.kategori === "arsa" ? sql`and i.emlak_turu = 'arsa'` : f.kategori === "konut" ? sql`and i.emlak_turu <> 'arsa'` : sql``}
     ${f.tip ? sql`and i.tip = ${f.tip}` : sql``}
     ${f.emlak_turu?.length ? sql`and i.emlak_turu in ${sql(f.emlak_turu)}` : sql``}

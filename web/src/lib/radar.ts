@@ -16,7 +16,7 @@ export async function radarPuanla(): Promise<{ aday: number; puanlanan: number; 
   const ilanlar = await sql`
     select i.id, i.tip::text as tip, i.emlak_turu, i.oda, i.net_m2, i.yatak_kapasitesi, i.fiyat, i.para_birimi, i.fiyat_birimi,
            i.kira_suresi_gun, m.ad as mahalle
-    from ilanlar i left join mahalleler m on m.id = i.mahalle_id where i.durum = 'yayinda'`;
+    from ilanlar i left join mahalleler m on m.id = i.mahalle_id where i.durum = 'yayinda' and not i.demo`;
 
   const gozlemler: Gozlem[] = [
     ...adaylar.map((a) => ({

@@ -11,6 +11,7 @@ import { DILLER, dilIle, type Dil } from "./lib/dil.js";
 import { UPLOAD_DIZIN } from "./config.js";
 import { migrate, sql } from "./db.js";
 import { radarPuanla } from "./lib/radar.js";
+import { siteAyarYukle } from "./lib/site-ayar.js";
 import { admin } from "./routes/admin.js";
 import { api } from "./routes/api.js";
 import { ara } from "./routes/ara.js";
@@ -76,6 +77,7 @@ app.onError((e, c) => {
 
 await migrate(join(kok, "db", "migrations"));
 await ilkYonetici();
+await siteAyarYukle();
 // KVKK: ilana dönüşmeyen adayların kişisel verisini günde bir temizle.
 setInterval(() => sql`select adaylari_temizle()`.catch((e) => console.error("temizlik", e)), 24 * 3600_000);
 setInterval(() => sql`delete from oturumlar where bitis < now()`.catch(() => {}), 3600_000);
