@@ -10,6 +10,7 @@ import { cikisYap, ekipGerekli, girisYap, sifreHashle, type Ortam } from "../aut
 import { SITE_ADI, UPLOAD_DIZIN } from "../config.js";
 import { sql } from "../db.js";
 import { csvOku } from "../lib/csv.js";
+import { radarPuanla } from "../lib/radar.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_ANAHTARLARI, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 import {
   ADAY_DURUM_ETIKET, BAYRAK_ETIKET, fiyatMetni, ODA_ETIKET, para, tarih, TIP_ETIKET, TUR_ETIKET, yuzde,
@@ -115,6 +116,7 @@ admin.get("/adaylar", async (c) => {
         <h1>Adaylar</h1>
         <div class="eylemler">
           <a href={`/admin/adaylar?sekme=${sekme}${sadeceBen ? "" : "&ben=1"}`} class="dugme ikincil">{sadeceBen ? "Herkesinkiler" : "Bana atananlar"}</a>
+          <form method="post" action="/admin/adaylar/puanla"><button class="dugme ikincil">Puanları yeniden hesapla</button></form>
           <a href="/admin/aday-yeni" class="dugme">+ Aday ekle</a>
         </div>
       </div>
@@ -130,10 +132,10 @@ admin.get("/adaylar", async (c) => {
             {liste.map((a) => (
               <tr class={a.bugun ? "bugun" : ""} onclick={`location='/admin/aday/${a.id}'`}>
                 <td data-et="Tip">{TIP_ETIKET[a.tip]}</td>
-                <td data-et="Başlık"><a href={`/admin/aday/${a.id}`}>{a.baslik}</a>{a.fiyat_dustu && <span class="etiket mavi">fiyat düştü</span>}</td>
+                <td data-et="Başlık"><a href={`/admin/aday/${a.id}`}>{a.baslik}</a>{a.firsat && <span class="etiket yesil">fırsat</span>}{a.fiyat_dustu && <span class="etiket mavi">fiyat düştü</span>}</td>
                 <td data-et="Mahalle">{a.mahalle ?? "—"}</td>
                 <td data-et="Fiyat">{a.fiyat ? para(a.fiyat, a.para_birimi) : "—"}</td>
-                <td data-et="İskonto">{yuzde(a.iskonto)}</td>
+                <td data-et="İskonto" title={a.grup_adi ? `${a.grup_adi} · ${a.grup_buyuklugu} ilan` : "karşılaştırma yok"}>{a.iskonto != null ? (a.iskonto >= 0 ? yuzde(a.iskonto) : `−${yuzde(-a.iskonto)} (üstünde)`) : "—"}</td>
                 <td data-et="Sahip">{yuzde(a.sahip_olasiligi)}</td>
                 <td data-et="Yayında">{a.yayinda_gun != null ? `${a.yayinda_gun} gün` : "—"}</td>
                 <td data-et="Bayrak">{a.kirmizi_bayraklar.map((b: string) => <span class="etiket kirmizi">{BAYRAK_ETIKET[b] ?? b}</span>)}</td>
@@ -148,6 +150,8 @@ admin.get("/adaylar", async (c) => {
       <details class="kutu-panel">
         <summary>CSV içe aktar (radar çıktısı)</summary>
         <form method="post" action="/admin/adaylar/csv" enctype="multipart/form-data" class="form">
+          <p class="kucuk">Ek sütunlar (puanlama için önerilir): aciklama (ilan metni), ilan_veren (sahibinden/emlakci), sezon_ay.
+            iskonto/sahip_olasiligi verilirse ve hesaplanamazsa korunur.</p>
           <p class="kucuk">Sütunlar: kaynak, kaynak_url, kaynak_ilan_no, tip, emlak_turu, baslik, mahalle (slug), net_m2, oda,
             yatak_kapasitesi, fiyat, para_birimi, fiyat_birimi, bolge_medyani, iskonto, sahip_olasiligi, oncelik, yayinda_gun,
             fiyat_dustu, kirmizi_bayraklar (; ile), sahip_adi, telefon. Aynı kaynak + kaynak_ilan_no güncellenir.</p>
@@ -157,6 +161,11 @@ admin.get("/adaylar", async (c) => {
       </details>
     </AdminSayfa>,
   );
+});
+
+admin.post("/adaylar/puanla", async (c) => {
+  await radarPuanla();
+  return c.redirect("/admin/adaylar");
 });
 
 admin.get("/aday-yeni", async (c) => {
@@ -187,6 +196,7 @@ admin.post("/aday-yeni", async (c) => {
     values (${s(b, "kaynak") ?? "diger"}, ${s(b, "kaynak_url")}, ${randomUUID()}, ${s(b, "tip")}, ${s(b, "emlak_turu")}, ${s(b, "baslik")},
       ${n(b, "mahalle_id")}, ${n(b, "net_m2")}, ${s(b, "oda")}, ${n(b, "fiyat")}, ${n(b, "yatak_kapasitesi")},
       ${s(b, "sahip_adi")}, ${s(b, "telefon")}, ${s(b, "notlar")}, ${c.get("kullanici").id}) returning id`;
+  await radarPuanla();
   return c.redirect(`/admin/aday/${a.id}`);
 });
 
@@ -211,22 +221,29 @@ admin.post("/adaylar/csv", async (c) => {
         fiyat_dustu: ["1", "true", "evet"].includes((r.fiyat_dustu ?? "").toLowerCase()),
         kirmizi_bayraklar: (r.kirmizi_bayraklar ?? "").split(";").map((x) => x.trim()).filter(Boolean),
         sahip_adi: r.sahip_adi || null, telefon: r.telefon || null,
+        aciklama: r.aciklama || null, sezon_ay: num("sezon_ay"),
+        ilan_veren: ["sahibinden", "emlakci"].includes(r.ilan_veren ?? "") ? r.ilan_veren : null,
+        elle_puan: !!(r.iskonto || r.sahip_olasiligi),
       };
       await sql`insert into adaylar ${sql(kayit)}
         on conflict (kaynak, kaynak_ilan_no) do update set
           fiyat = excluded.fiyat, iskonto = excluded.iskonto, bolge_medyani = excluded.bolge_medyani,
           sahip_olasiligi = excluded.sahip_olasiligi, oncelik = excluded.oncelik, yayinda_gun = excluded.yayinda_gun,
           fiyat_dustu = excluded.fiyat_dustu or coalesce(excluded.fiyat < adaylar.fiyat, false),
-          kirmizi_bayraklar = excluded.kirmizi_bayraklar, updated_at = now()`;
+          kirmizi_bayraklar = excluded.kirmizi_bayraklar, aciklama = coalesce(excluded.aciklama, adaylar.aciklama),
+          ilan_veren = coalesce(excluded.ilan_veren, adaylar.ilan_veren), sezon_ay = coalesce(excluded.sezon_ay, adaylar.sezon_ay),
+          elle_puan = excluded.elle_puan, updated_at = now()`;
       eklenen++;
     } catch (e) {
       hatalar.push(`satır ${i + 2}: ${e instanceof Error ? e.message : e}`);
     }
   }
+  const puan = await radarPuanla();
   return c.html(
     <AdminSayfa baslik="CSV sonucu" kullanici={c.get("kullanici")}>
       <h1>CSV içe aktarma</h1>
       <p>{eklenen} satır eklendi / güncellendi, {hatalar.length} hata.</p>
+      <p>Puanlama: {puan.aday} adaydan {puan.puanlanan} tanesi piyasayla karşılaştırıldı, {puan.firsat} fırsat bulundu.</p>
       {hatalar.length > 0 && <ul class="hata-liste">{hatalar.slice(0, 50).map((h) => <li>{h}</li>)}</ul>}
       <a href="/admin/adaylar" class="dugme">Adaylara dön</a>
     </AdminSayfa>,
@@ -261,13 +278,23 @@ admin.get("/aday/:id", async (c) => {
             <dt>Mahalle</dt><dd>{a.mahalle ?? "—"}</dd>
             <dt>Fiyat</dt><dd>{a.fiyat ? para(a.fiyat, a.para_birimi) : "—"}</dd>
             <dt>Oda / m²</dt><dd>{a.oda ?? "—"} / {a.net_m2 ?? "—"}</dd>
-            <dt>Bölge ortancası</dt><dd>{a.bolge_medyani ? para(a.bolge_medyani) : "—"}</dd>
+            <dt>Bölge ortancası</dt><dd>{a.bolge_medyani ? `${para(a.bolge_medyani)} ${({ satilik: "/ m²", kiralik: "/ m² / ay", sezonluk: "/ m² / ay", gunluk: "/ kişi / gece" } as Record<string, string>)[a.tip] ?? ""}` : "—"}</dd>
             <dt>Ortancanın altında</dt><dd>{yuzde(a.iskonto)}</dd>
             <dt>Sahip olasılığı</dt><dd>{yuzde(a.sahip_olasiligi)}</dd>
             <dt>Yayında</dt><dd>{a.yayinda_gun != null ? `${a.yayinda_gun} gün` : "—"}{a.fiyat_dustu ? " · fiyat düştü" : ""}</dd>
             <dt>Atanan</dt><dd>{a.atanan_ad ?? "—"}</dd>
           </dl>
           {a.kirmizi_bayraklar.length > 0 && <p>{a.kirmizi_bayraklar.map((b: string) => <span class="etiket kirmizi">{BAYRAK_ETIKET[b] ?? b}</span>)}</p>}
+          {a.puan_gerekce && (
+            <div class="gerekce">
+              <strong>Neden bu puan?</strong>{a.firsat && <span class="etiket yesil">fırsat</span>}
+              <p class="kucuk">Fiyat</p>
+              <ul>{(a.puan_gerekce.fiyat ?? []).map((x: string) => <li>{x}</li>)}</ul>
+              <p class="kucuk">Sahibinden mi? ({yuzde(a.sahip_olasiligi)})</p>
+              <ul>{(a.puan_gerekce.sahip ?? []).map((x: string) => <li>{x}</li>)}</ul>
+              <p class="kucuk">Puanlandı: {tarih(a.puanlandi_at)}</p>
+            </div>
+          )}
           {a.notlar && <p class="not">{a.notlar}</p>}
           <form method="post" action={`/admin/aday/${a.id}/ata`}><button class="dugme ikincil">Bana ata</button></form>
           {a.durum === "onaylandi" && (

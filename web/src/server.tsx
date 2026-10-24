@@ -10,6 +10,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { DILLER, dilIle, type Dil } from "./lib/dil.js";
 import { UPLOAD_DIZIN } from "./config.js";
 import { migrate, sql } from "./db.js";
+import { radarPuanla } from "./lib/radar.js";
 import { admin } from "./routes/admin.js";
 import { api } from "./routes/api.js";
 import { ara } from "./routes/ara.js";
@@ -76,6 +77,8 @@ await ilkYonetici();
 // KVKK: ilana dönüşmeyen adayların kişisel verisini günde bir temizle.
 setInterval(() => sql`select adaylari_temizle()`.catch((e) => console.error("temizlik", e)), 24 * 3600_000);
 setInterval(() => sql`delete from oturumlar where bitis < now()`.catch(() => {}), 3600_000);
+// Radar puanları her gece (yeni gözlemlerle medyanlar değişir).
+setInterval(() => radarPuanla().catch((e) => console.error("radar", e)), 24 * 3600_000);
 
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port, hostname: process.env.HOST ?? "0.0.0.0" }, () => console.log(`dinleniyor :${port}`));
