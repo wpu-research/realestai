@@ -101,9 +101,47 @@ panel.querySelector("[data-yakinimda]")?.addEventListener("click", () => {
   );
 });
 
-// ---------- Harita ----------
+// ---------- Sonuçları sayfa yenilemeden yükle (harita alanı, sıralama) ----------
 const sonucAlani = document.querySelector("[data-sonuc-alani]");
 const sayiEl = document.querySelector("[data-sonuc-sayi]");
+let istekNo = 0;
+let haritaYenile = () => {};
+
+async function sonuclariYukle(url, { gecmis = "replace" } = {}) {
+  const benim = ++istekNo;
+  sonucAlani.classList.add("yukleniyor");
+  try {
+    const html = await (await fetch(url)).text();
+    if (benim !== istekNo) return false;   // daha yeni bir istek geldi
+    const yeni = new DOMParser().parseFromString(html, "text/html");
+    sonucAlani.innerHTML = yeni.querySelector("[data-sonuc-alani]").innerHTML;
+    sayiEl.textContent = yeni.querySelector("[data-sonuc-sayi]").textContent;
+    const sirala = document.querySelector("[data-sirala]");
+    const yeniSirala = yeni.querySelector("[data-sirala]");
+    if (sirala && yeniSirala) sirala.innerHTML = yeniSirala.innerHTML;
+    const u = new URL(url, location.href);
+    panel.querySelector("input[name=siralama]").value = u.searchParams.get("siralama") ?? "";
+    const tarih = panel.querySelectorAll("input[name=ilan_tarihi]");
+    tarih.forEach((r) => (r.checked = r.value === (u.searchParams.get("ilan_tarihi") ?? "")));
+    history[gecmis === "push" ? "pushState" : "replaceState"](null, "", u);
+    haritaYenile(JSON.parse(sonucAlani.querySelector("[data-noktalar]")?.textContent || "[]"));
+    return true;
+  } finally {
+    if (benim === istekNo) sonucAlani.classList.remove("yukleniyor");
+  }
+}
+
+// Sırala: aynı ekranda, sayfa yenilenmeden
+document.addEventListener("click", (e) => {
+  const a = e.target.closest(".sirala-menu a");
+  if (!a) return;
+  e.preventDefault();
+  document.querySelector("[data-sirala]").open = false;
+  sonuclariYukle(a.href, { gecmis: "push" });
+});
+window.addEventListener("popstate", () => sonuclariYukle(location.href));
+
+// ---------- Harita ----------
 const mobilHarita = document.querySelector("[data-mobil-harita]");
 
 panel.querySelector("[data-haritada-ara]")?.addEventListener("click", () => {
@@ -167,27 +205,13 @@ if (el && window.L) {
   setTimeout(() => (sistemHareketi = false), 600);
 
   let zamanlayici;
-  let istek = 0;
+  haritaYenile = isaretle;
   async function alaniAra() {
     const b = harita.getBounds();
     const deger = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map((x) => x.toFixed(5)).join(",");
     const url = new URL(location.href);
     url.searchParams.set("sinir", deger);
-    const benim = ++istek;
-    sonucAlani.classList.add("yukleniyor");
-    try {
-      const html = await (await fetch(url)).text();
-      if (benim !== istek) return; // daha yeni bir istek geldi
-      const yeni = new DOMParser().parseFromString(html, "text/html");
-      sonucAlani.innerHTML = yeni.querySelector("[data-sonuc-alani]").innerHTML;
-      sayiEl.textContent = yeni.querySelector("[data-sonuc-sayi]").textContent;
-      sinirGizli.value = deger;
-      history.replaceState(null, "", url);
-      isaretle(noktalariOku());
-      buAlanda.hidden = true;
-    } finally {
-      if (benim === istek) sonucAlani.classList.remove("yukleniyor");
-    }
+    if (await sonuclariYukle(url)) { sinirGizli.value = deger; buAlanda.hidden = true; }
   }
 
   harita.on("moveend", () => {

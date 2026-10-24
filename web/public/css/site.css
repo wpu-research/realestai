@@ -520,3 +520,9 @@ legend { font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
 .galeri-ana { position: relative; }
 .temsili-etiket { position: absolute; right: 12px; bottom: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: .72rem; padding: 3px 9px; border-radius: 6px; }
 .mahalle-karo::after { content: "temsili"; position: absolute; top: 8px; right: 10px; font-size: .62rem; color: rgba(255,255,255,.75); letter-spacing: .04em; }
+.ekspertiz-link { display: inline-block; margin-top: 12px; font-size: .85rem; font-weight: 500; text-decoration: none; }
+@media (max-width: 1023px) {
+  .filtre-panel { z-index: 1500; }           /* harita kontrollerinin (Leaflet z-index 400–1000) üstünde */
+  .filtre-panel.acik { box-shadow: 0 -10px 40px rgba(0,0,0,.2), 0 0 0 100vmax rgba(0,0,0,.35); }
+}
+.endeks-tablo td strong { white-space: nowrap; }

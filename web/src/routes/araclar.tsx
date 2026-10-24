@@ -189,6 +189,69 @@ araclar.post("/emlakci-bul", async (c) => {
   return c.redirect("/emlakci-bul?ok=1");
 });
 
+// ---------- Ekspertiz talebi ----------
+araclar.get("/ekspertiz", async (c) => {
+  const ok = c.req.query("ok") === "1";
+  const ilanNo = Number(c.req.query("ilan")) || null;
+  const [ilan] = ilanNo ? await sql`select i.ilan_no, i.baslik, m.ad as mahalle from ilanlar i left join mahalleler m on m.id = i.mahalle_id
+                                   where i.ilan_no = ${ilanNo} and i.durum = 'yayinda'` : [];
+  const mh = await sql<{ ad: string }[]>`select ad from mahalleler order by ad`;
+  return c.html(
+    <Sayfa baslik="Gayrimenkul ekspertizi" scriptler={["/js/form.js"]}>
+      <div class="liste-sayfa">
+        <div class="kap orta-dar">
+          <span class="ust-etiket">Alırken · Satarken</span>
+          <h1>Gayrimenkul ekspertizi isteyin</h1>
+          <p class="alt-baslik">Evin piyasa değerini ve yasal durumunu bağımsız bir değerleme raporuyla öğrenin. Raporu SPK lisanslı
+            değerleme uzmanları hazırlar; ücret ve süreyi danışmanımız size iletir.</p>
+          {ok ? <div class="kart-kutu"><div class="basari">Talebiniz alındı. Danışmanımız ekspertiz için sizinle iletişime geçecek.</div></div> : (
+            <form method="post" class="kart-kutu form" data-kvkk-form>
+              {ilan && <div class="kum-not">İlan: <strong>#{ilan.ilan_no} {ilan.baslik}</strong> ({ilan.mahalle})</div>}
+              <input type="hidden" name="ilan_no" value={ilan?.ilan_no ?? ""} />
+              <div class="iki">
+                <label>Ad soyad *<input name="ad_soyad" required /></label>
+                <label>Telefon *<input name="telefon" type="tel" required /></label>
+              </div>
+              <label>E-posta<input name="eposta" type="email" /></label>
+              <div class="iki">
+                <label>Neden ekspertiz?
+                  <select name="amac">
+                    <option>Satın almadan önce</option><option>Konut kredisi</option><option>Satış fiyatını belirlemek</option>
+                    <option>Miras / paylaşım</option><option>Diğer</option>
+                  </select>
+                </label>
+                <label>Mahalle
+                  <select name="mahalle"><option value="">—</option>{mh.map((m) => <option selected={ilan?.mahalle === m.ad}>{m.ad}</option>)}</select>
+                </label>
+              </div>
+              <div class="iki">
+                <label>Emlak türü
+                  <select name="tur"><option>Daire</option><option>Villa</option><option>Müstakil ev</option><option>Arsa</option><option>Diğer</option></select>
+                </label>
+                <label>Yaklaşık m²<input name="m2" type="number" min="0" /></label>
+              </div>
+              <label>Adres / not<textarea name="mesaj" rows={3} placeholder="Ada/parsel biliyorsanız yazabilirsiniz"></textarea></label>
+              <label class="kutu"><input type="checkbox" name="kvkk_onay" value="1" required /><span><a href="/yasal/kvkk" target="_blank">KVKK aydınlatma metnini okudum, kabul ediyorum</a> *</span></label>
+              <button class="dugme tam">Ekspertiz istiyorum</button>
+            </form>
+          )}
+        </div>
+      </div>
+    </Sayfa>,
+  );
+});
+
+araclar.post("/ekspertiz", async (c) => {
+  const b = await c.req.parseBody();
+  const s = (k: string) => (typeof b[k] === "string" && (b[k] as string).trim() ? (b[k] as string).trim().slice(0, 2000) : null);
+  if (!s("ad_soyad") || !s("telefon") || b.kvkk_onay !== "1") return c.text("Lütfen ad, telefon ve KVKK onayını doldurun.", 400);
+  const [ilan] = s("ilan_no") ? await sql`select id from ilanlar where ilan_no = ${Number(s("ilan_no"))}` : [];
+  await sql`insert into talepler (ilan_id, ad_soyad, telefon, eposta, mesaj, kvkk_onay, konu, ayrinti)
+            values (${ilan?.id ?? null}, ${s("ad_soyad")}, ${s("telefon")}, ${s("eposta")}, ${s("mesaj")}, true, 'ekspertiz',
+                    ${sql.json({ amac: s("amac"), mahalle: s("mahalle"), tur: s("tur"), m2: s("m2") })})`;
+  return c.redirect("/ekspertiz?ok=1");
+});
+
 // ---------- Rehberler ----------
 const REHBER: Record<string, { baslik: string; ust: string; giris: string; bolumler: { id?: string; baslik: string; maddeler: string[] }[] }> = {
   alirken: {
@@ -212,6 +275,7 @@ const REHBER: Record<string, { baslik: string; ust: string; giris: string; bolum
         "Raporu SPK lisanslı değerleme uzmanları hazırlar. Konut kredisi kullanırken banka ekspertizi kendisi yaptırır.",
         "Yabancı alıcılar için tapu işlemlerinde değerleme raporu istenir.",
         "Fiyat pazarlığında rapordaki değer ve <a href=\"/endeks\">emlak endeksimizdeki</a> mahalle ortancası güçlü dayanaktır.",
+        "<a href=\"/ekspertiz\">Ekspertiz talep formunu</a> doldurun; danışmanımız lisanslı bir değerleme uzmanıyla süreci başlatsın.",
       ] },
       { baslik: "5. Masraflar", maddeler: [
         "Tapu harcı: alıcı ve satıcı için ayrı ayrı, beyan edilen değer üzerinden alınır; beyan değeri belediye rayiç değerinin altında olamaz.",

@@ -146,7 +146,7 @@ ara.get("/", async (c) => {
 
           <Bolum baslik="Konut özellikleri" acik={var_("oda", "bina_yasi", "kat_sayisi", "kat", "ara_kat", "isitma", "banyo", "mutfak",
             "balkon", "asansor", "otopark", "esya", "yapi_durumu", "site_ici", "ozel_alan", "tapu", "kimden", "ilan_tarihi", "fotolu",
-            "videolu", "haritali", "cephe", "havuz")}>
+            "videolu", "haritali", "cephe")}>
             <h4>Oda sayısı</h4>
             <Cipler ad="oda" liste={ODA.map((o) => ({ k: o, e: o === "6+1" ? "6+1 ve üzeri" : o }))} />
             <h4>Bina yaşı</h4><Cipler ad="bina_yasi" liste={BINA_YASI} />
@@ -162,13 +162,6 @@ ara.get("/", async (c) => {
             <h4>Donanım</h4>
             <div class="cipler">
               <Evet ad="balkon" etiket="Balkon" /><Evet ad="asansor" etiket="Asansör" /><Evet ad="otopark" etiket="Otopark" />
-            </div>
-            <h4>Havuz</h4>
-            <div class="cipler">
-              <Cip ad="havuz" deger="" etiket="Fark etmez" secili={!f.havuz} radyo />
-              <Cip ad="havuz" deger="herhangi" etiket="Havuzlu" secili={f.havuz === "herhangi"} radyo />
-              <Cip ad="havuz" deger="ozel" etiket="Özel havuz" secili={f.havuz === "ozel"} radyo />
-              <Cip ad="havuz" deger="ortak" etiket="Ortak havuz" secili={f.havuz === "ortak"} radyo />
             </div>
             <h4>Eşya</h4>
             <div class="cipler">
@@ -192,7 +185,19 @@ ara.get("/", async (c) => {
           </Bolum>
 
           {OZELLIK_GRUPLARI.map((g) => (
-            <Bolum baslik={g.baslik} acik={g.secenekler.some((o) => dizide("ozellik", o.k))}>
+            <Bolum baslik={g.baslik} acik={g.secenekler.some((o) => dizide("ozellik", o.k)) || (g.ad === "dis" && !!f.havuz)}>
+              {g.ad === "dis" && (
+                <>
+                  <h4>Havuz</h4>
+                  <div class="cipler">
+                    <Cip ad="havuz" deger="" etiket="Fark etmez" secili={!f.havuz} radyo />
+                    <Cip ad="havuz" deger="herhangi" etiket="Havuzlu" secili={f.havuz === "herhangi"} radyo />
+                    <Cip ad="havuz" deger="ozel" etiket="Özel havuz" secili={f.havuz === "ozel"} radyo />
+                    <Cip ad="havuz" deger="ortak" etiket="Ortak havuz" secili={f.havuz === "ortak"} radyo />
+                  </div>
+                  <h4>Diğer</h4>
+                </>
+              )}
               <Cipler ad="ozellik" liste={g.secenekler} />
             </Bolum>
           ))}

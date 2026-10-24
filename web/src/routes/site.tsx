@@ -198,6 +198,7 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
               {i.bolge_medyani && <p class="kucuk">Bu mahallede benzer ilanların ortanca birim fiyatı: {para(i.bolge_medyani)}{i.tip === "kiralik" ? " / m² / ay" : " / m²"}{i.iskonto ? ` — bu ilan ${yuzde(i.iskonto)} altında` : ""}</p>}
               {i.eids_no && <div class="dogrulama"><Onay boyut={15} /> EİDS doğrulanmış ilan · {i.eids_no}</div>}
               {i.turizm_izin_no && <div class="dogrulama"><Onay boyut={15} /> Turizm izin belge no: {i.turizm_izin_no}</div>}
+              {["satilik"].includes(i.tip) && <a href={`/ekspertiz?ilan=${i.ilan_no}`} class="ekspertiz-link">Bu ev için ekspertiz isteyin →</a>}
             </div>
 
             <div class="kart-kutu">

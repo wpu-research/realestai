@@ -32,9 +32,17 @@ function filtreler() {
       for (const sec of v.gruplar ?? []) a.secenekler.find((s) => s.deger === sec)?.mahalleler?.forEach((x) => m.add(x));
       (v.secili ?? []).forEach((x) => m.add(x));
       if (m.size) f.mahalleler = [...m];
-    } else if (a.id === "olmazsa_olmaz") {
-      for (const sec of v) Object.assign(f, a.secenekler.find((s) => s.deger === sec)?.filtre ?? {});
-    } else if (a.id === "firsat" && v) f.sadece_firsat = true;
+    } else if (a.tur === "coklu_secim" && a.secenekler.some((s) => s.filtre)) {
+      // Seçeneğin taşıdığı filtreler birleşir; özellik listeleri toplanır.
+      for (const sec of v) {
+        const filtre = a.secenekler.find((s) => s.deger === sec)?.filtre ?? {};
+        for (const [k, x] of Object.entries(filtre)) {
+          if (k === "ozellik") f.ozellik = [...new Set([...(f.ozellik ?? []), ...x])];
+          else f[k] = x;
+        }
+      }
+    } else if (a.tur === "coklu_secim" && a.alan && v.length) f[a.alan] = v;
+    else if (a.id === "firsat" && v) f.sadece_firsat = true;
   }
   return f;
 }
@@ -176,8 +184,8 @@ async function ozetCiz() {
     postJson("/api/sihirbaz-oturum", { filtreler: f, tamamlandi: true, adim_sayisi: yol.length, sonuc_sayisi: sayi }).catch(() => {});
     const el = govde.querySelector(".sonuc-sayi");
     el.innerHTML = sayi > 0
-      ? `<a class="dugme tam buyuk" href="${url}">${sayi} ilanı göster</a>`
-      : `<p>Bu kriterlerle şu an ilan yok. Bütçeyi ya da bölgeyi değiştirmeyi deneyin.</p><a class="dugme ikincil" href="${url}">Yine de sonuçlara git</a>`;
+      ? `<a class="dugme tam buyuk" href="${escape(url)}">${sayi} ilanı göster</a>`
+      : `<p>Bu kriterlerle şu an ilan yok. Bütçeyi ya da bölgeyi değiştirmeyi deneyin.</p><a class="dugme ikincil" href="${escape(url)}">Yine de sonuçlara git</a>`;
   } catch {
     govde.querySelector(".sonuc-sayi").innerHTML = `<a class="dugme tam" href="/ara">Sonuçlara git</a>`;
   }

@@ -793,6 +793,7 @@ admin.get("/talepler", async (c) => {
             <p>{t.telefon && <a href={`tel:${t.telefon}`}>{t.telefon}</a>}{t.eposta && ` · ${t.eposta}`} · {tarih(t.created_at)}</p>
             {t.ilan_no && <p>İlan: <a href={`/ilan/${t.ilan_no}`} target="_blank">#{t.ilan_no} {t.baslik}</a></p>}
             {t.konu === "emlakci_bul" && <p><span class="etiket mavi">Bana emlakçı bul</span> {[t.ayrinti?.istek, t.ayrinti?.bolge, t.ayrinti?.butce, t.ayrinti?.zaman].filter(Boolean).join(" · ")}</p>}
+            {t.konu === "ekspertiz" && <p><span class="etiket mavi">Ekspertiz</span> {[t.ayrinti?.amac, t.ayrinti?.mahalle, t.ayrinti?.tur, t.ayrinti?.m2 && `${t.ayrinti.m2} m²`].filter(Boolean).join(" · ")}</p>}
             {t.giris_tarihi && <p>{new Date(t.giris_tarihi).toLocaleDateString("tr-TR")} – {t.cikis_tarihi ? new Date(t.cikis_tarihi).toLocaleDateString("tr-TR") : "?"} · {t.kisi_sayisi ?? "?"} kişi</p>}
             {t.mesaj && <p class="not">{t.mesaj}</p>}
             <form method="post" action={`/admin/talep/${t.id}`} class="satir-form">

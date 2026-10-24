@@ -8,19 +8,43 @@
       "alan": "tip",
       "zorunlu": true,
       "secenekler": [
-        { "deger": "satilik", "etiket": "Ev satın almak", "ikon": "home" },
-        { "deger": "kiralik", "etiket": "Yıllık kiralamak", "ikon": "key" },
-        { "deger": "sezonluk", "etiket": "Yazı geçirmek (birkaç ay)", "ikon": "sun" },
-        { "deger": "gunluk", "etiket": "Tatil (gecelik / haftalık)", "ikon": "palmtree" }
+        {
+          "deger": "satilik",
+          "etiket": "Ev satın almak",
+          "ikon": "home"
+        },
+        {
+          "deger": "kiralik",
+          "etiket": "Yıllık kiralamak",
+          "ikon": "key"
+        },
+        {
+          "deger": "sezonluk",
+          "etiket": "Yazı geçirmek (birkaç ay)",
+          "ikon": "sun"
+        },
+        {
+          "deger": "gunluk",
+          "etiket": "Tatil (gecelik / haftalık)",
+          "ikon": "palmtree"
+        }
       ]
     },
     {
       "id": "tarihler",
       "soru": "Hangi tarihlerde?",
       "tur": "tarih_araligi",
-      "alanlar": ["giris_tarihi", "cikis_tarihi"],
+      "alanlar": [
+        "giris_tarihi",
+        "cikis_tarihi"
+      ],
       "zorunlu": true,
-      "gosterIf": { "tip": ["gunluk", "sezonluk"] },
+      "gosterIf": {
+        "tip": [
+          "gunluk",
+          "sezonluk"
+        ]
+      },
       "yardim": "Tarihleriniz esnekse yaklaşık seçin, sonra değiştirebilirsiniz."
     },
     {
@@ -32,7 +56,12 @@
       "max": 20,
       "varsayilan": 2,
       "zorunlu": true,
-      "gosterIf": { "tip": ["gunluk", "sezonluk"] }
+      "gosterIf": {
+        "tip": [
+          "gunluk",
+          "sezonluk"
+        ]
+      }
     },
     {
       "id": "amac",
@@ -40,13 +69,66 @@
       "tur": "tek_secim",
       "alan": "_amac",
       "zorunlu": false,
-      "gosterIf": { "tip": ["satilik"] },
+      "gosterIf": {
+        "tip": [
+          "satilik"
+        ]
+      },
       "secenekler": [
-        { "deger": "oturum", "etiket": "Kendim / ailem oturacak" },
-        { "deger": "yazlik", "etiket": "Yazlık olarak kullanacağım" },
-        { "deger": "yatirim", "etiket": "Yatırım / kiraya vermek" }
+        {
+          "deger": "oturum",
+          "etiket": "Kendim / ailem oturacak"
+        },
+        {
+          "deger": "yazlik",
+          "etiket": "Yazlık olarak kullanacağım"
+        },
+        {
+          "deger": "yatirim",
+          "etiket": "Yatırım / kiraya vermek"
+        }
       ],
       "_not": "_amac filtre değildir; yatirim seçilirse siralama='en_firsat' ve sadece_firsat önerilir, oturum seçilirse Konacık/merkez gibi yıl boyu yaşanan mahalleler öne çıkar."
+    },
+    {
+      "id": "konut_tipi",
+      "soru": "Nasıl bir ev düşünüyorsunuz?",
+      "tur": "coklu_secim",
+      "alan": "emlak_turu",
+      "zorunlu": false,
+      "gosterIf": {
+        "tip": [
+          "satilik",
+          "kiralik",
+          "sezonluk"
+        ]
+      },
+      "secenekler": [
+        {
+          "deger": "daire",
+          "etiket": "Daire"
+        },
+        {
+          "deger": "villa",
+          "etiket": "Villa"
+        },
+        {
+          "deger": "dubleks",
+          "etiket": "Dubleks"
+        },
+        {
+          "deger": "tripleks",
+          "etiket": "Tripleks"
+        },
+        {
+          "deger": "tek_kat_villa",
+          "etiket": "Tek kat villa"
+        },
+        {
+          "deger": "mustakil",
+          "etiket": "Müstakil ev"
+        }
+      ]
     },
     {
       "id": "oda",
@@ -54,26 +136,121 @@
       "tur": "coklu_secim",
       "alan": "oda",
       "zorunlu": false,
-      "gosterIf": { "tip": ["satilik", "kiralik", "sezonluk"] },
+      "gosterIf": {
+        "tip": [
+          "satilik",
+          "kiralik",
+          "sezonluk"
+        ]
+      },
       "secenekler": [
-        { "deger": "1+1", "etiket": "1+1" },
-        { "deger": "2+1", "etiket": "2+1" },
-        { "deger": "3+1", "etiket": "3+1" },
-        { "deger": "4+1", "etiket": "4+1 ve üzeri" }
+        {
+          "deger": "1+1",
+          "etiket": "1+1"
+        },
+        {
+          "deger": "2+1",
+          "etiket": "2+1"
+        },
+        {
+          "deger": "3+1",
+          "etiket": "3+1"
+        },
+        {
+          "deger": "4+1",
+          "etiket": "4+1 ve üzeri"
+        }
       ]
     },
     {
       "id": "butce",
       "soru": "Bütçeniz ne kadar?",
       "tur": "butce",
-      "alanlar": ["min_fiyat", "max_fiyat", "para_birimi"],
+      "alanlar": [
+        "min_fiyat",
+        "max_fiyat",
+        "para_birimi"
+      ],
       "zorunlu": true,
-      "birimEtiketi": { "satilik": "toplam", "kiralik": "aylık", "sezonluk": "sezon toplamı", "gunluk": "gecelik" },
+      "birimEtiketi": {
+        "satilik": "toplam",
+        "kiralik": "aylık",
+        "sezonluk": "sezon toplamı",
+        "gunluk": "gecelik"
+      },
       "hazirAraliklar": {
-        "satilik": [[0, 5000000], [5000000, 10000000], [10000000, 20000000], [20000000, null]],
-        "kiralik": [[0, 30000], [30000, 50000], [50000, 80000], [80000, null]],
-        "sezonluk": [[0, 300000], [300000, 600000], [600000, 1200000], [1200000, null]],
-        "gunluk": [[0, 3000], [3000, 6000], [6000, 12000], [12000, null]]
+        "satilik": [
+          [
+            0,
+            5000000
+          ],
+          [
+            5000000,
+            10000000
+          ],
+          [
+            10000000,
+            20000000
+          ],
+          [
+            20000000,
+            null
+          ]
+        ],
+        "kiralik": [
+          [
+            0,
+            30000
+          ],
+          [
+            30000,
+            50000
+          ],
+          [
+            50000,
+            80000
+          ],
+          [
+            80000,
+            null
+          ]
+        ],
+        "sezonluk": [
+          [
+            0,
+            300000
+          ],
+          [
+            300000,
+            600000
+          ],
+          [
+            600000,
+            1200000
+          ],
+          [
+            1200000,
+            null
+          ]
+        ],
+        "gunluk": [
+          [
+            0,
+            3000
+          ],
+          [
+            3000,
+            6000
+          ],
+          [
+            6000,
+            12000
+          ],
+          [
+            12000,
+            null
+          ]
+        ]
       },
       "_not": "Hazır aralıklar kartlarla seçilir, altında elle giriş. Aralıklar TRY; para birimi değişirse kur tablosuyla çevrilir."
     },
@@ -84,12 +261,59 @@
       "alan": "mahalleler",
       "zorunlu": false,
       "secenekler": [
-        { "deger": "@sakin", "etiket": "Sakin, doğayla iç içe", "mahalleler": ["gumusluk", "akyarlar", "gundogan", "golkoy"] },
-        { "deger": "@hareketli", "etiket": "Hareketli, eğlence ve restoranlar", "mahalleler": ["merkez", "gumbet", "yalikavak", "turgutreis"] },
-        { "deger": "@aile", "etiket": "Aile dostu, plajlar", "mahalleler": ["bitez", "ortakent", "turgutreis", "torba"] },
-        { "deger": "@luks", "etiket": "Lüks ve prestijli", "mahalleler": ["yalikavak", "golturkbuku", "torba"] },
-        { "deger": "@yilboyu", "etiket": "Yıl boyu yaşamak için", "mahalleler": ["konacik", "merkez", "turgutreis", "ortakent"] },
-        { "deger": "@harita", "etiket": "Haritadan kendim seçeyim" }
+        {
+          "deger": "@sakin",
+          "etiket": "Sakin, doğayla iç içe",
+          "mahalleler": [
+            "gumusluk",
+            "akyarlar",
+            "gundogan",
+            "golkoy"
+          ]
+        },
+        {
+          "deger": "@hareketli",
+          "etiket": "Hareketli, eğlence ve restoranlar",
+          "mahalleler": [
+            "merkez",
+            "gumbet",
+            "yalikavak",
+            "turgutreis"
+          ]
+        },
+        {
+          "deger": "@aile",
+          "etiket": "Aile dostu, plajlar",
+          "mahalleler": [
+            "bitez",
+            "ortakent",
+            "turgutreis",
+            "torba"
+          ]
+        },
+        {
+          "deger": "@luks",
+          "etiket": "Lüks ve prestijli",
+          "mahalleler": [
+            "yalikavak",
+            "golturkbuku",
+            "torba"
+          ]
+        },
+        {
+          "deger": "@yilboyu",
+          "etiket": "Yıl boyu yaşamak için",
+          "mahalleler": [
+            "konacik",
+            "merkez",
+            "turgutreis",
+            "ortakent"
+          ]
+        },
+        {
+          "deger": "@harita",
+          "etiket": "Haritadan kendim seçeyim"
+        }
       ],
       "_not": "@ ile başlayan seçenekler mahalle gruplarıdır; seçilince ilgili mahalle slug'ları filtreye eklenir. @harita seçilirse mahalle haritası açılır."
     },
@@ -99,13 +323,234 @@
       "tur": "coklu_secim",
       "zorunlu": false,
       "secenekler": [
-        { "deger": "havuz", "etiket": "Havuz", "filtre": { "havuz": "herhangi" } },
-        { "deger": "ozel_havuz", "etiket": "Özel havuz", "filtre": { "havuz": "ozel" } },
-        { "deger": "manzara", "etiket": "Deniz manzarası", "filtre": { "deniz_manzarasi": true } },
-        { "deger": "deniz_yakin", "etiket": "Denize yürüme mesafesi", "filtre": { "max_denize_mesafe_m": 500 } },
-        { "deger": "site", "etiket": "Site içinde", "filtre": { "site_ici": true } },
-        { "deger": "esyali", "etiket": "Eşyalı", "filtre": { "esyali": true }, "gosterIf": { "tip": ["kiralik", "satilik"] } },
-        { "deger": "evcil", "etiket": "Evcil hayvan kabul", "filtre": { "evcil_hayvan": true }, "gosterIf": { "tip": ["kiralik", "sezonluk", "gunluk"] } }
+        {
+          "deger": "havuz",
+          "etiket": "Havuz",
+          "filtre": {
+            "havuz": "herhangi"
+          }
+        },
+        {
+          "deger": "ozel_havuz",
+          "etiket": "Özel havuz",
+          "filtre": {
+            "havuz": "ozel"
+          }
+        },
+        {
+          "deger": "jakuzi",
+          "etiket": "Jakuzi",
+          "filtre": {
+            "ozellik": [
+              "jakuzili"
+            ]
+          }
+        },
+        {
+          "deger": "manzara",
+          "etiket": "Deniz manzarası",
+          "filtre": {
+            "deniz_manzarasi": true
+          }
+        },
+        {
+          "deger": "deniz_yakin",
+          "etiket": "Denize yürüme mesafesi",
+          "filtre": {
+            "max_denize_mesafe_m": 500
+          }
+        },
+        {
+          "deger": "bahce",
+          "etiket": "Bahçe",
+          "filtre": {
+            "ozellik": [
+              "bahce"
+            ]
+          }
+        },
+        {
+          "deger": "teras",
+          "etiket": "Teras",
+          "filtre": {
+            "ozellik": [
+              "teras"
+            ]
+          }
+        },
+        {
+          "deger": "somine",
+          "etiket": "Şömine",
+          "filtre": {
+            "ozellik": [
+              "somine"
+            ]
+          }
+        },
+        {
+          "deger": "otopark",
+          "etiket": "Otopark",
+          "filtre": {
+            "otopark": true
+          }
+        },
+        {
+          "deger": "asansor",
+          "etiket": "Asansör",
+          "filtre": {
+            "asansor": true
+          },
+          "gosterIf": {
+            "tip": [
+              "satilik",
+              "kiralik"
+            ]
+          }
+        },
+        {
+          "deger": "site",
+          "etiket": "Site içinde",
+          "filtre": {
+            "site_ici": true
+          }
+        },
+        {
+          "deger": "esyali",
+          "etiket": "Eşyalı",
+          "filtre": {
+            "esya": "esyali"
+          },
+          "gosterIf": {
+            "tip": [
+              "kiralik",
+              "satilik"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "yakinlik",
+      "soru": "Yakınında ne olsun?",
+      "tur": "coklu_secim",
+      "zorunlu": false,
+      "secenekler": [
+        {
+          "deger": "plaj",
+          "etiket": "Plaj",
+          "filtre": {
+            "ozellik": [
+              "plaj"
+            ]
+          }
+        },
+        {
+          "deger": "market",
+          "etiket": "Market",
+          "filtre": {
+            "ozellik": [
+              "market"
+            ]
+          }
+        },
+        {
+          "deger": "okul",
+          "etiket": "Okul",
+          "filtre": {
+            "ozellik": [
+              "okul"
+            ]
+          }
+        },
+        {
+          "deger": "hastane",
+          "etiket": "Hastane",
+          "filtre": {
+            "ozellik": [
+              "hastane"
+            ]
+          }
+        },
+        {
+          "deger": "restoran",
+          "etiket": "Restoran",
+          "filtre": {
+            "ozellik": [
+              "restoran"
+            ]
+          }
+        },
+        {
+          "deger": "carsi",
+          "etiket": "Çarşı",
+          "filtre": {
+            "ozellik": [
+              "carsi"
+            ]
+          }
+        },
+        {
+          "deger": "marina",
+          "etiket": "Marina",
+          "filtre": {
+            "ozellik": [
+              "marina"
+            ]
+          }
+        },
+        {
+          "deger": "havalimani",
+          "etiket": "Havalimanı",
+          "filtre": {
+            "ozellik": [
+              "havalimani"
+            ]
+          }
+        },
+        {
+          "deger": "dolmus",
+          "etiket": "Otobüs / dolmuş durağı",
+          "filtre": {
+            "ozellik": [
+              "dolmus"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "uygunluk",
+      "soru": "Ev kimlere uygun olmalı?",
+      "tur": "coklu_secim",
+      "zorunlu": false,
+      "secenekler": [
+        {
+          "deger": "engelli_yasli_uygun",
+          "etiket": "Engelli veya yaşlıya uygun",
+          "filtre": {
+            "ozellik": [
+              "engelli_yasli_uygun"
+            ]
+          }
+        },
+        {
+          "deger": "cocuklu_uygun",
+          "etiket": "Çocuklu aileye uygun",
+          "filtre": {
+            "ozellik": [
+              "cocuklu_uygun"
+            ]
+          }
+        },
+        {
+          "deger": "hayvanli_uygun",
+          "etiket": "Evcil hayvanla uygun",
+          "filtre": {
+            "ozellik": [
+              "hayvanli_uygun"
+            ]
+          }
+        }
       ]
     },
     {
@@ -114,7 +559,12 @@
       "tur": "evet_hayir",
       "alan": "sadece_firsat",
       "zorunlu": false,
-      "gosterIf": { "tip": ["satilik", "kiralik"] }
+      "gosterIf": {
+        "tip": [
+          "satilik",
+          "kiralik"
+        ]
+      }
     }
   ]
 }

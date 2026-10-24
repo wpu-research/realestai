@@ -66,7 +66,7 @@ export function Sayfa({ baslik, aciklama, children, harita, scriptler = [] }: Sa
               <p>Bodrum · Milas · Didim</p>
               <p class="kucuk">Taşınmaz Ticareti Yetki Belgesi No: [doldurulacak]</p>
               <p class="alt-araclar">
-                <a href="/endeks">Emlak endeksi</a> · <a href="/kredi">Kredi hesapla</a> · <a href="/emlakci-bul">Bana emlakçı bul</a> ·{" "}
+                <a href="/endeks">Emlak endeksi</a> · <a href="/kredi">Kredi hesapla</a> · <a href="/emlakci-bul">Bana emlakçı bul</a> · <a href="/ekspertiz">Ekspertiz</a> ·{" "}
                 <a href="/rehber/alirken">Alırken</a> · <a href="/rehber/satarken">Satarken</a> · <a href="/rehber/kiralarken">Kiralarken</a> ·{" "}
                 <a href="/asistan">Didem'le konuş</a>
               </p>
