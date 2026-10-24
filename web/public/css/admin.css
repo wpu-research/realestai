@@ -76,3 +76,6 @@ code { font-size: .8rem; word-break: break-all; }
 .eylemler form { display: inline; }
 .okuma { font-size: 1.15rem; line-height: 1.9; padding-left: 26px; }
 .kutu-panel .satir-form label { display: flex; flex-direction: column; font-size: .85rem; gap: 2px; }
+.derinlik-liste { display: grid; gap: 12px; margin-top: 12px; }
+.derinlik canvas { width: 100%; border-radius: 8px; display: block; background: #eceff1; }
+.derinlik .eylemler { margin-top: 6px; align-items: center; }

@@ -16,6 +16,22 @@ olan:
 | Görünmeyen kısımları da doldurmak | Görüntüden-dünya üretici modeller (ör. World Labs Marble; API ve lisans kontrol edilecek) | Daha sürükleyici ama **uydurma** kısımlar içerir — uyarı bu yüzden şart |
 | Kat planı | Fotoğraflar + ilan m²/oda bilgisi → LLM/vision ile şematik plan | "Tahmini kat planı" |
 
+## Durum (2026-10-24)
+
+**Katman 1 — tek fotoğraftan derinlikli görünüm: yayında.**
+- Model: Depth Anything V2 **Small** (Apache-2.0, ticari kullanım serbest). Base/Large sürümleri
+  CC-BY-NC — **kullanılmaz**.
+- Üretim admin tarayıcısında (transformers.js; WebGPU, yoksa WASM). Sunucuda GPU gerekmez, maliyet yok.
+  Admin → ilan → "Temsili 3D" → "Eksik derinlikleri üret" → önizle → **Onayla** (kalite kapısı: yalnız
+  onaylı olanlar sitede; derinlik farkı çok düşükse uyarı).
+- Sitede ilan galerisinde "3D görünüm (temsili)" düğmesi → WebGL paralaks görüntüleyici; filigran
+  ve uyarı metni (TR/EN/RU/DE) her zaman görünür.
+- DEMO ilanlar için derinlikler `web/scripts/demo-derinlik.py` ile yerelde üretildi.
+
+**Katman 2 — aynı odanın birden çok fotoğrafından gezinilebilir 3D (Gaussian splat): karar bekliyor.**
+Kiralık GPU (Modal/RunPod) mı, ücretli servis mi seçilecek; lisansı ticari kullanıma uygun model
+seçilmeli (VGGT/MASt3R lisansları kontrol edilecek).
+
 ## Boru hattı
 
 1. **Fotoğraf sınıflandırma** — vision model (Claude) her fotoğrafa oda etiketi verir:

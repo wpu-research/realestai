@@ -437,17 +437,19 @@ admin.get("/ilan/:id", async (c) => {
   const id = c.req.param("id");
   const [i] = await sql`select * from ilanlar where id = ${id}`;
   if (!i) return c.notFound();
-  const [fotolar, mh] = await Promise.all([
+  const [fotolar, mh, derinlikler] = await Promise.all([
     sql`select * from ilan_fotolari where ilan_id = ${id} order by sira`,
     sql`select id, ad, ilce from mahalleler order by ilce, ad`,
+    sql`select id, foto_id, dosya_url, onaylandi, kalite from gorsel_3d where ilan_id = ${id} and yontem = 'tek_goruntu_derinlik'`,
   ]);
+  const derinlik = new Map(derinlikler.map((d) => [d.foto_id, d]));
   const kontrol = yayinKontrol(i, fotolar.length);
   const hazir = kontrol.every((k) => k.tamam);
   const v = (x: unknown) => (x == null ? "" : String(x));
   const ceviri = (dil: string, alan: string) => v(i.ceviriler?.[dil]?.[alan]);
 
   return c.html(
-    <AdminSayfa baslik={`İlan ${i.ilan_no}`} kullanici={c.get("kullanici")} scriptler={["/js/admin.js"]}>
+    <AdminSayfa baslik={`İlan ${i.ilan_no}`} kullanici={c.get("kullanici")} scriptler={["/js/admin.js", "/js/admin-3d.js"]}>
       <a href="/admin/ilanlar" class="geri">← İlanlar</a>
       <div class="baslik-satir">
         <h1>#{i.ilan_no} · {i.baslik}</h1>
@@ -603,6 +605,36 @@ admin.get("/ilan/:id", async (c) => {
                   </form>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div class="kutu-panel" data-3d={`/admin/ilan/${i.id}/3d`}>
+            <h2>Temsili 3D</h2>
+            <p class="kucuk">Her fotoğraftan derinlik haritası çıkarılır; sitede fareyle/parmakla oynatılan derinlikli görünüm olur.
+              Hesap bu tarayıcıda yapılır (Depth Anything V2 Small, Apache-2.0). Yalnız onayladıklarınız sitede görünür,
+              her zaman "Temsili — YZ ile üretildi" uyarısıyla.</p>
+            {fotolar.map((f) => <span hidden data-3d-foto={f.id} data-url={f.url} data-var={derinlik.has(f.id) ? "1" : undefined}></span>)}
+            <button type="button" class="dugme tam" data-3d-uret disabled={!fotolar.length}>
+              Eksik derinlikleri üret ({fotolar.filter((f) => !derinlik.has(f.id)).length})
+            </button>
+            <div class="zeka-durum" data-3d-durum></div>
+            <div class="derinlik-liste">
+              {fotolar.filter((f) => derinlik.has(f.id)).map((f) => {
+                const d = derinlik.get(f.id)!;
+                return (
+                  <div class="derinlik">
+                    <canvas data-foto={f.url} data-onizle={d.dosya_url}></canvas>
+                    {d.kalite?.uyari && <p class="hata-liste">{d.kalite.uyari}</p>}
+                    <div class="eylemler">
+                      <form method="post" action={`/admin/3d/${d.id}/onay`}>
+                        <button class={d.onaylandi ? "dugme ikincil" : "dugme"}>{d.onaylandi ? "Yayından kaldır" : "Onayla"}</button>
+                      </form>
+                      <form method="post" action={`/admin/3d/${d.id}/sil`}><button class="metin-dugme">Sil</button></form>
+                      {d.onaylandi && <span class="etiket yesil">sitede</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </aside>
@@ -1164,3 +1196,42 @@ admin.get("/avatar/kayit-metni", (c) =>
     </AdminSayfa>,
   ),
 );
+
+// ================= TEMSİLİ 3D (derinlikli fotoğraf) =================
+admin.post("/ilan/:id/3d", async (c) => {
+  const id = c.req.param("id");
+  const b = await c.req.parseBody();
+  const fotoId = s(b, "foto_id");
+  const dosya = b.derinlik;
+  if (!fotoId || !(dosya instanceof File) || dosya.size > 20_000_000) return c.json({ hata: "foto_id ve derinlik gerekli" }, 400);
+  const [f] = await sql`select id, oda_etiketi from ilan_fotolari where id = ${fotoId} and ilan_id = ${id}`;
+  if (!f) return c.json({ hata: "fotoğraf bu ilana ait değil" }, 404);
+  // Hafif bulanıklık kenarlardaki yırtılmayı azaltır. Derinlik farkı çok azsa (düz duvar, yakın çekim) uyarı.
+  const gri = sharp(Buffer.from(await dosya.arrayBuffer())).grayscale().blur(1.2);
+  const { channels } = await gri.clone().stats();
+  const sapma = Math.round(channels[0].stdev * 10) / 10;
+  const jpeg = await gri.jpeg({ quality: 90 }).toBuffer();
+  const dizin = join(UPLOAD_DIZIN, "ilan", id, "3d");
+  await mkdir(dizin, { recursive: true });
+  const ad = `${f.id}-${Date.now()}.jpg`;
+  await writeFile(join(dizin, ad), jpeg);
+  const kalite = { derinlik_sapma: sapma, uyari: sapma < 12 ? "Derinlik farkı çok az; 3D etkisi zayıf olabilir." : null };
+  const [eski] = await sql`select dosya_url from gorsel_3d where foto_id = ${f.id} and yontem = 'tek_goruntu_derinlik'`;
+  await sql`insert into gorsel_3d (ilan_id, foto_id, oda, yontem, dosya_url, kalite, model)
+    values (${id}, ${f.id}, ${f.oda_etiketi ?? "diger"}, 'tek_goruntu_derinlik', ${`/uploads/ilan/${id}/3d/${ad}`},
+            ${sql.json(kalite)}, ${s(b, "model")})
+    on conflict (foto_id, yontem) where foto_id is not null do update set
+      dosya_url = excluded.dosya_url, kalite = excluded.kalite, model = excluded.model, onaylandi = false, created_at = now()`;
+  if (eski) await unlink(join(UPLOAD_DIZIN, eski.dosya_url.replace(/^\/uploads\//, ""))).catch(() => {});
+  return c.json({ ok: true, kalite });
+});
+admin.post("/3d/:gid/onay", async (c) => {
+  const [g] = await sql`update gorsel_3d set onaylandi = not onaylandi where id = ${c.req.param("gid")} returning ilan_id`;
+  return g ? c.redirect(`/admin/ilan/${g.ilan_id}`) : c.notFound();
+});
+admin.post("/3d/:gid/sil", async (c) => {
+  const [g] = await sql`delete from gorsel_3d where id = ${c.req.param("gid")} returning ilan_id, dosya_url`;
+  if (!g) return c.notFound();
+  await unlink(join(UPLOAD_DIZIN, g.dosya_url.replace(/^\/uploads\//, ""))).catch(() => {});
+  return c.redirect(`/admin/ilan/${g.ilan_id}`);
+});

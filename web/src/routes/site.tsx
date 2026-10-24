@@ -7,7 +7,7 @@ import { sql } from "../db.js";
 import { filtreOku, gevsetmeOnerisi, ilanAra, type Filtreler, type IlanKart } from "../lib/arama.js";
 import { fiyatMetni, kisaFiyat, ODA_ETIKET, para, TIP_ETIKET, TUR_ETIKET, yuzde } from "../lib/bicim.js";
 import { Ara, Ayar, Konum, Mikrofon, Ok, Onay } from "../views/ikon.js";
-import { demoGorselleri, Fiyat, IlanKarti, ilanMetni, json, mahalleGorseli, ornekGorsel, Sayfa } from "../views/layout.js";
+import { demoDerinligi, demoGorselleri, Fiyat, IlanKarti, ilanMetni, json, mahalleGorseli, ornekGorsel, Sayfa } from "../views/layout.js";
 import { CEPHE, ISITMA, KIMDEN, KONUT_TIPLERI, MUTFAK, OZELLIK_GRUPLARI, TAPU, YAPI_DURUMU } from "../lib/ozellikler.js";
 
 const etiket = (liste: { k: string; e: string }[], k: string | null) => (k ? t(liste.find((x) => x.k === k)?.e ?? k) : null);
@@ -112,6 +112,13 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
     const uretilmis = demoGorselleri(no);
     fotolar = (uretilmis.length ? uretilmis : [0, 1, 2, 3].map((k) => ornekGorsel(no + k - 1))).map((url) => ({ url, oda_etiketi: null })) as any;
   }
+  // Temsili 3D: onaylı derinlik haritaları; DEMO ilanlarda önceden üretilmiş olanlar.
+  const ucBoyut: { foto: string; derinlik: string }[] = (await sql<{ foto: string; derinlik: string }[]>`
+    select f.url as foto, g.dosya_url as derinlik from gorsel_3d g join ilan_fotolari f on f.id = g.foto_id
+    where g.ilan_id = ${i.id} and g.onaylandi and g.yontem = 'tek_goruntu_derinlik' order by f.sira`).map((r) => ({ ...r }));
+  if (!ucBoyut.length && i.demo) {
+    fotolar.forEach((f, k) => { const d = demoDerinligi(no, k); if (d && f.url === demoGorselleri(no)[k]) ucBoyut.push({ foto: f.url, derinlik: d }); });
+  }
   const benzer = (await ilanAra({ tip: i.tip }, { limit: 4 }) as IlanKart[]).filter((x) => x.id !== i.id).slice(0, 3);
   const gonderildi = c.req.query("talep") === "ok";
   const metin = ilanMetni(i as any);
@@ -155,7 +162,9 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
         <div class="ilan-govde">
           <div class="ilan-sol">
             <div class="galeri" data-galeri>
-              <div class="galeri-ana"><img src={fotolar[0]?.url ?? ""} alt={metin.baslik} data-ana />{i.demo && <span class="temsili-etiket">{t("Temsili görsel")}</span>}</div>
+              <div class="galeri-ana"><img src={fotolar[0]?.url ?? ""} alt={metin.baslik} data-ana />{i.demo && <span class="temsili-etiket">{t("Temsili görsel")}</span>}
+                {ucBoyut.length > 0 && <button type="button" class="uc-boyut-dugme" data-3d-ac>{t("3D görünüm")} <small>({t("temsili")})</small></button>}
+              </div>
               {fotolar.length > 1 && (
                 <div class="galeri-kucuk">
                   {fotolar.map((f, k) => (
@@ -166,6 +175,26 @@ site.get("/ilan/:no{[0-9]+}", async (c) => {
                 </div>
               )}
             </div>
+            {ucBoyut.length > 0 && (
+              <dialog class="uc-boyut" data-3d-pencere>
+                <div class="uc-boyut-ust">
+                  <strong>{t("3D görünüm")}</strong>
+                  <button type="button" class="metin-dugme" data-3d-kapat>{t("Kapat")}</button>
+                </div>
+                <div class="uc-boyut-sahne">
+                  <canvas data-3d-tuval></canvas>
+                  <span class="uc-boyut-filigran">{t("Temsili — YZ ile üretildi")}</span>
+                </div>
+                <p class="uc-boyut-uyari"><strong>{t("Temsili görseldir.")}</strong> {t("Bu 3D görünüm ilan fotoğraflarından yapay zekâ ile otomatik üretilmiştir. Ölçüler, oda düzeni, malzeme ve görünüm gerçeği yansıtmayabilir; bazı alanlar yapay zekâ tarafından tamamlanmıştır. Karar vermeden önce mülkü yerinde görün.")}</p>
+                <p class="kucuk">{t("Fareyi gezdirin ya da parmağınızla kaydırın.")}</p>
+                {ucBoyut.length > 1 && (
+                  <div class="galeri-kucuk">{ucBoyut.map((u, k) => (
+                    <button type="button" class={k === 0 ? "aktif" : ""} data-3d-sec={k}><img src={u.foto} alt="" loading="lazy" /></button>
+                  ))}</div>
+                )}
+                <script type="application/json" data-3d-veri>{json(ucBoyut)}</script>
+              </dialog>
+            )}
             <p class="aciklama">{metin.aciklama}</p>
 
             <h2>{t("Özellikler")}</h2>

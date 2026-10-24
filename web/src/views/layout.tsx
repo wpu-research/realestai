@@ -112,6 +112,9 @@ export const mahalleGorseli = (slug: string, k: number) =>
 // DEMO ilan için k. temsili görsel (yoksa null)
 export const demoGorseli = (no: number, k: number) =>
   ILAN_GORSEL.has(`demo-${no}-${k}.jpg`) ? `/img/ilan/demo-${no}-${k}.jpg` : null;
+// DEMO görselin derinlik haritası (temsili 3D için; scripts/demo-derinlik.py üretir)
+export const demoDerinligi = (no: number, k: number) =>
+  ILAN_GORSEL.has(`demo-${no}-${k}-derinlik.jpg`) ? `/img/ilan/demo-${no}-${k}-derinlik.jpg` : null;
 export const demoGorselleri = (no: number) =>
   [0, 1, 2, 3].map((k) => demoGorseli(no, k)).filter((x): x is string => !!x);
 
